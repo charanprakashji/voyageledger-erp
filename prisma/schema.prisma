@@ -1,0 +1,1158 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --------------------------------------------------------
+// ENUMS
+// --------------------------------------------------------
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  ACCOUNTANT
+  TRAVEL_AGENT
+  AUDITOR
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum CustomerType {
+  INDIVIDUAL
+  CORPORATE
+  GOVERNMENT
+  NGO
+  EMBASSY
+}
+
+enum SupplierType {
+  AIRLINE
+  HOTEL
+  VISA_PROVIDER
+  TRANSPORT_COMPANY
+  DMC
+  INSURANCE_PROVIDER
+  OTHER
+}
+
+enum BookingStatus {
+  DRAFT
+  QUOTATION
+  CONFIRMED
+  PARTIALLY_PAID
+  PAID
+  COMPLETED
+  CANCELLED
+}
+
+enum ServiceType {
+  FLIGHT
+  HOTEL
+  VISA
+  TRANSFER
+  TOUR
+  INSURANCE
+  BUS
+  TRAIN
+  CAR_RENTAL
+  OTHER
+}
+
+enum ServiceStatus {
+  PENDING
+  CONFIRMED
+  ISSUED
+  CANCELLED
+  REFUNDED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  APPROVED
+  POSTED
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+}
+
+enum ReceiptStatus {
+  DRAFT
+  APPROVED
+  POSTED
+  CANCELLED
+}
+
+enum SupplierBillStatus {
+  DRAFT
+  APPROVED
+  POSTED
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+}
+
+enum SupplierPaymentStatus {
+  DRAFT
+  APPROVED
+  POSTED
+  CANCELLED
+}
+
+enum ExpenseStatus {
+  DRAFT
+  APPROVED
+  POSTED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CREDIT_CARD
+  CHEQUE
+  HAWALA_TRANSFER
+  EXCHANGE_OFFICE
+  OTHER
+}
+
+// --- GENERAL LEDGER ACCOUNTING ENUMS ---
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum NormalBalance {
+  DEBIT
+  CREDIT
+}
+
+enum JournalStatus {
+  DRAFT
+  POSTED
+  REVERSED
+}
+
+enum LedgerEntryType {
+  DEBIT
+  CREDIT
+}
+
+enum TransactionSourceType {
+  INVOICE
+  RECEIPT
+  SUPPLIER_BILL
+  SUPPLIER_PAYMENT
+  EXPENSE
+  MANUAL_JOURNAL
+  OPENING_BALANCE
+  YEAR_END_CLOSING
+  REVERSAL
+}
+
+enum ExpenseCategory {
+  DIRECT_BOOKING_COST
+  OFFICE_RENT
+  SALARIES
+  UTILITIES
+  MARKETING
+  BANK_FEES
+  SOFTWARE_SUBSCRIPTION
+  OFFICE_EXPENSES
+  OTHER
+}
+
+// --------------------------------------------------------
+// COMPANY SETTINGS & PROFILE
+// --------------------------------------------------------
+
+model CompanySetting {
+  id                    String   @id @default(uuid())
+  companyName           String   @default("Ariana Horizon Travel & Tourism")
+  logo                  String?
+  address               String?
+  province              String?  @default("Kabul")
+  district              String?
+  city                  String?  @default("Kabul")
+  country               String   @default("Afghanistan")
+  phone                 String?
+  email                 String?
+  taxNumber             String?  // Tax Identification Number (TIN)
+  taxRegistrationNumber String?  // Business License / Registration
+  defaultCurrency       String   @default("AFN")
+  supportedCurrencies   String[] @default(["AFN", "USD", "EUR", "AED"])
+  financialYearStart    String   @default("01-01") // MM-DD or 03-21 for Solar Hijri
+  invoicePrefix         String   @default("INV-")
+  receiptPrefix         String   @default("RCT-")
+  billPrefix            String   @default("BIL-")
+  paymentPrefix         String   @default("PAY-")
+  expensePrefix         String   @default("EXP-")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@map("company_settings")
+}
+
+// --------------------------------------------------------
+// USERS & RBAC
+// --------------------------------------------------------
+
+model User {
+  id           String      @id @default(uuid())
+  email        String      @unique
+  name         String
+  passwordHash String
+  role         UserRole    @default(TRAVEL_AGENT)
+  status       UserStatus  @default(ACTIVE)
+  phone        String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  bookingsCreated          Booking[]          @relation("BookingCreatedBy")
+  bookingsCancelled        Booking[]          @relation("BookingCancelledBy")
+  invoicesCreated          Invoice[]          @relation("InvoiceCreatedBy")
+  invoicesApproved         Invoice[]          @relation("InvoiceApprovedBy")
+  invoicesPosted           Invoice[]          @relation("InvoicePostedBy")
+  invoicesCancelled        Invoice[]          @relation("InvoiceCancelledBy")
+  receiptsCreated          Receipt[]          @relation("ReceiptCreatedBy")
+  receiptsApproved         Receipt[]          @relation("ReceiptApprovedBy")
+  receiptsPosted           Receipt[]          @relation("ReceiptPostedBy")
+  receiptsCancelled        Receipt[]          @relation("ReceiptCancelledBy")
+  supplierBillsCreated     SupplierBill[]     @relation("SupplierBillCreatedBy")
+  supplierBillsApproved    SupplierBill[]     @relation("SupplierBillApprovedBy")
+  supplierBillsPosted      SupplierBill[]     @relation("SupplierBillPostedBy")
+  supplierBillsCancelled   SupplierBill[]     @relation("SupplierBillCancelledBy")
+  supplierPaymentsCreated  SupplierPayment[]  @relation("SupplierPaymentCreatedBy")
+  supplierPaymentsApproved SupplierPayment[]  @relation("SupplierPaymentApprovedBy")
+  supplierPaymentsPosted   SupplierPayment[]  @relation("SupplierPaymentPostedBy")
+  supplierPaymentsCancelled SupplierPayment[] @relation("SupplierPaymentCancelledBy")
+  expensesCreated          Expense[]          @relation("ExpenseCreatedBy")
+  expensesApproved         Expense[]          @relation("ExpenseApprovedBy")
+  expensesPosted           Expense[]          @relation("ExpensePostedBy")
+  expensesCancelled        Expense[]          @relation("ExpenseCancelledBy")
+  journalEntriesCreated    JournalEntry[]     @relation("JournalCreatedBy")
+  periodsLocked            AccountingPeriod[] @relation("PeriodLockedBy")
+  auditLogs                AuditLog[]
+
+  @@map("users")
+}
+
+// --------------------------------------------------------
+// GENERAL LEDGER: CHART OF ACCOUNTS & PERIODS (Hierarchy)
+// --------------------------------------------------------
+
+model ChartOfAccount {
+  id                   String              @id @default(uuid())
+  code                 String              @unique // e.g. "1010", "1100", "4010"
+  name                 String              // e.g. "Cash (AFN)", "Air Ticket Revenue"
+  accountType          AccountType         // ASSET, LIABILITY, EQUITY, REVENUE, EXPENSE
+  normalBalance        NormalBalance       // DEBIT, CREDIT
+  parentAccountId      String?
+  currency             String              @default("AFN")
+  description          String?
+  isActive             Boolean             @default(true)
+  isSystem             Boolean             @default(false)
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  parentAccount                ChartOfAccount?     @relation("AccountHierarchy", fields: [parentAccountId], references: [id])
+  subAccounts                  ChartOfAccount[]    @relation("AccountHierarchy")
+  journalLines                 JournalLine[]
+  taxConfigurations            TaxConfiguration[]
+  invoiceLinesRevenue          InvoiceLine[]       @relation("InvoiceRevenueAccount")
+  invoiceLinesTax              InvoiceLine[]       @relation("InvoiceTaxAccount")
+  receiptBankAccounts          Receipt[]           @relation("ReceiptBankAccount")
+  supplierBillLinesCost        SupplierBillLine[]  @relation("SupplierBillCostAccount")
+  supplierPaymentBankAccounts  SupplierPayment[]   @relation("SupplierPaymentBankAccount")
+  expenseBankAccounts          Expense[]           @relation("ExpenseBankAccount")
+  expenseLinesAccount          ExpenseLine[]       @relation("ExpenseAccount")
+
+  @@index([accountType, isActive])
+  @@map("chart_of_accounts")
+}
+
+model AccountingPeriod {
+  id            String         @id @default(uuid())
+  name          String         // e.g. "September 2026", "Q3 2026", "1405 Solar Year"
+  financialYear String         // e.g. "2026" or "1405"
+  startDate     DateTime
+  endDate       DateTime
+  isLocked      Boolean        @default(false)
+  lockedAt      DateTime?
+  lockedById    String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  lockedBy      User?          @relation("PeriodLockedBy", fields: [lockedById], references: [id], onDelete: SetNull)
+  journals      JournalEntry[]
+
+  @@index([startDate, endDate])
+  @@index([financialYear])
+  @@map("accounting_periods")
+}
+
+// --------------------------------------------------------
+// FLEXIBLE TAX CONFIGURATION (Admin Configurable)
+// --------------------------------------------------------
+
+model TaxConfiguration {
+  id                     String          @id @default(uuid())
+  taxCode                String          @unique // e.g. "TAX-01", "BRT", "WHT"
+  taxName                String          // e.g. "Business Receipts Tax", "Service Tax", "Standard Withholding"
+  percentage             Decimal         @db.Decimal(6, 4) // e.g. 4.0000%
+  isActive               Boolean         @default(true)
+  effectiveFrom          DateTime        @default(now())
+  effectiveTo            DateTime?
+  applicableServiceTypes String[]        // List of applicable services (FLIGHT, HOTEL, VISA, etc.)
+  liabilityAccountId     String?         // Linked to 2030 Taxes Payable account
+  description            String?
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+
+  liabilityAccount       ChartOfAccount? @relation(fields: [liabilityAccountId], references: [id], onDelete: SetNull)
+
+  @@map("tax_configurations")
+}
+
+// --------------------------------------------------------
+// GENERAL LEDGER: JOURNAL ENTRIES & JOURNAL LINES (Multi-Currency)
+// --------------------------------------------------------
+
+model JournalEntry {
+  id              String            @id @default(uuid())
+  entryNumber     String            @unique // e.g. "JE-2026-00001"
+  entryDate       DateTime          @default(now())
+  description     String
+  referenceType   String?           // "INVOICE", "RECEIPT", "SUPPLIER_BILL", "SUPPLIER_PAYMENT", "EXPENSE", "ADVANCE_ALLOCATION", "REVERSAL"
+  referenceId     String?           // ID of associated Invoice, Receipt, Bill, Payment, Expense, etc.
+  status          JournalStatus     @default(DRAFT)
+  periodId        String?
+  createdById     String
+  postedAt        DateTime?
+  reversalOfId    String?           @unique // Linked to original entry if this is a reversal
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  createdBy       User              @relation("JournalCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  period          AccountingPeriod? @relation(fields: [periodId], references: [id], onDelete: SetNull)
+  reversalEntry   JournalEntry?     @relation("JournalReversal", fields: [reversalOfId], references: [id])
+  originalEntry   JournalEntry?     @relation("JournalReversal")
+  lines           JournalLine[]
+  invoice         Invoice?          @relation("InvoiceJournal")
+  receipt         Receipt?          @relation("ReceiptJournal")
+  supplierBill    SupplierBill?     @relation("SupplierBillJournal")
+  supplierPayment SupplierPayment?  @relation("SupplierPaymentJournal")
+  expense         Expense?          @relation("ExpenseJournal")
+
+  @@index([entryDate, status])
+  @@index([referenceType, referenceId])
+  @@map("journal_entries")
+}
+
+model JournalLine {
+  id                  String          @id @default(uuid())
+  journalEntryId      String
+  accountId           String
+  
+  // Base Operating Currency (AFN)
+  debit               Decimal         @default(0.00) @db.Decimal(15, 2)
+  credit              Decimal         @default(0.00) @db.Decimal(15, 2)
+  
+  // Multi-Currency Tracking
+  currency            String          @default("AFN") // AFN, USD, EUR, AED
+  exchangeRate        Decimal         @default(1.000000) @db.Decimal(18, 6) // Rate to base AFN
+  foreignDebit        Decimal         @default(0.00) @db.Decimal(15, 2)
+  foreignCredit       Decimal         @default(0.00) @db.Decimal(15, 2)
+
+  description         String?
+  customerId          String?         // Dimensional tracking: Customer AR sub-ledger
+  supplierId          String?         // Dimensional tracking: Supplier AP sub-ledger
+  bookingId           String?         // Dimensional tracking: Booking project/file
+  createdAt           DateTime        @default(now())
+
+  journalEntry        JournalEntry    @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account             ChartOfAccount  @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  customer            Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  supplier            Supplier?       @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  booking             Booking?        @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  @@index([journalEntryId, accountId])
+  @@index([customerId])
+  @@index([supplierId])
+  @@index([bookingId])
+  @@map("journal_lines")
+}
+
+// --------------------------------------------------------
+// MASTER DATA: CUSTOMERS (Afghanistan Localized)
+// --------------------------------------------------------
+
+model Customer {
+  id                    String           @id @default(uuid())
+  code                  String           @unique // e.g. CUST-00101
+  type                  CustomerType     @default(INDIVIDUAL)
+  name                  String
+  companyName           String?
+  contactPerson         String?
+  email                 String?
+  phone                 String?
+  alternatePhone        String?
+  
+  // Generic Tax Fields
+  taxNumber             String?          // Tax Identification Number (TIN)
+  taxRegistrationNumber String?          // Business Registration / Tax License
+  taxCategory           String?          // Corporate, Individual, NGO, Embassy
+
+  // Afghanistan Address
+  address               String?
+  province              String?          @default("Kabul")
+  district              String?
+  city                  String?          @default("Kabul")
+  country               String           @default("Afghanistan")
+  postalCode            String?
+  
+  defaultCurrency       String           @default("AFN")
+  creditLimit           Decimal          @default(0.00) @db.Decimal(15, 2)
+  paymentTermsDays      Int              @default(30)
+  notes                 String?
+  isActive              Boolean          @default(true)
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  bookings              Booking[]
+  invoices              Invoice[]
+  receipts              Receipt[]
+  journalLines          JournalLine[]
+
+  @@map("customers")
+}
+
+// --------------------------------------------------------
+// MASTER DATA: SUPPLIERS (Afghanistan Localized)
+// --------------------------------------------------------
+
+model Supplier {
+  id                    String           @id @default(uuid())
+  code                  String           @unique // e.g. SUP-00201
+  name                  String
+  type                  SupplierType     @default(OTHER)
+  contactPerson         String?
+  email                 String?
+  phone                 String?
+  
+  // Generic Tax Fields
+  taxNumber             String?          // Tax Identification Number
+  taxRegistrationNumber String?
+  taxCategory           String?
+
+  // Address
+  address               String?
+  province              String?
+  district              String?
+  city                  String?
+  country               String           @default("Afghanistan")
+
+  currency              String           @default("USD") // Often USD / AED for international suppliers
+  bankDetails           String?          // Bank name, Account number, IBAN, SWIFT, Hawala branch
+  paymentTermsDays      Int              @default(15)
+  notes                 String?
+  isActive              Boolean          @default(true)
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  serviceItems          BookingServiceItem[]
+  bills                 SupplierBill[]
+  payments              SupplierPayment[]
+  expenses              Expense[]
+  journalLines          JournalLine[]
+
+  @@map("suppliers")
+}
+
+// --------------------------------------------------------
+// BOOKINGS & SERVICE ITEMS (Multi-Currency Support)
+// --------------------------------------------------------
+
+model Booking {
+  id                 String               @id @default(uuid())
+  bookingNumber      String               @unique // e.g. BKG-2026-0001
+  customerId         String
+  createdById        String
+  cancelledById      String?
+  bookingDate        DateTime             @default(now())
+  travelStartDate    DateTime?
+  travelEndDate      DateTime?
+  status             BookingStatus        @default(DRAFT)
+  destination        String?
+  leadPassenger      String?
+  pnr                String?
+  supplierRef        String?
+  salesAgentId       String?
+  notes              String?
+  internalNotes      String?
+  cancellationReason String?
+  cancelledAt        DateTime?
+
+  // Financial Totals in Foreign & Base (AFN) Currencies
+  currency           String               @default("USD")
+  totalCostForeign   Decimal              @default(0.00) @db.Decimal(15, 2)
+  totalSellForeign   Decimal              @default(0.00) @db.Decimal(15, 2)
+  totalDiscount      Decimal              @default(0.00) @db.Decimal(15, 2)
+  totalTax           Decimal              @default(0.00) @db.Decimal(15, 2)
+  totalNetSelling    Decimal              @default(0.00) @db.Decimal(15, 2)
+  
+  // Base Operating Currency Equivalents (AFN)
+  totalCostPrice     Decimal              @default(0.00) @db.Decimal(15, 2)
+  totalSellPrice     Decimal              @default(0.00) @db.Decimal(15, 2)
+  totalGrossMargin   Decimal              @default(0.00) @db.Decimal(15, 2)
+
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  customer           Customer             @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  createdBy          User                 @relation("BookingCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  cancelledBy        User?                @relation("BookingCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  passengers         Passenger[]
+  serviceItems       BookingServiceItem[]
+  invoices           Invoice[]
+  receipts           Receipt[]
+  supplierBills      SupplierBill[]
+  supplierPayments   SupplierPayment[]
+  journalLines       JournalLine[]
+  attachments        DocumentAttachment[]
+
+  @@index([bookingNumber])
+  @@index([customerId])
+  @@index([status])
+  @@index([bookingDate])
+  @@map("bookings")
+}
+
+model Passenger {
+  id                     String    @id @default(uuid())
+  bookingId              String
+  title                  String?   @default("Mr") // Mr, Mrs, Ms, Dr, Master, Miss, Child, Infant
+  firstName              String
+  middleName             String?
+  lastName               String
+  dateOfBirth            DateTime?
+  gender                 String?   // MALE, FEMALE, OTHER
+  nationality            String?   @default("Afghan")
+  passportNumber         String?
+  passportIssueDate      DateTime?
+  passportExpiryDate     DateTime?
+  passportIssuingCountry String?   @default("Afghanistan")
+  visaNumber             String?
+  visaExpiryDate         DateTime?
+  phone                  String?
+  email                  String?
+  specialRequirements    String?
+  notes                  String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  booking                Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@index([passportNumber])
+  @@map("passengers")
+}
+
+model BookingServiceItem {
+  id                 String               @id @default(uuid())
+  bookingId          String
+  supplierId         String
+  serviceType        ServiceType
+  description        String
+  supplierRef        String?
+  serviceStartDate   DateTime?
+  serviceEndDate     DateTime?
+  quantity           Int                  @default(1)
+  passengerCount     Int                  @default(1)
+  
+  // Multi-Currency Transaction Amounts
+  currency           String               @default("USD")
+  exchangeRate       Decimal              @default(1.000000) @db.Decimal(18, 6)
+  costPriceForeign   Decimal              @default(0.00) @db.Decimal(15, 2)
+  sellPriceForeign   Decimal              @default(0.00) @db.Decimal(15, 2)
+  discountForeign    Decimal              @default(0.00) @db.Decimal(15, 2)
+  taxAmountForeign   Decimal              @default(0.00) @db.Decimal(15, 2)
+  netSellingForeign  Decimal              @default(0.00) @db.Decimal(15, 2)
+
+  // Base Currency Equivalent (AFN)
+  costPrice          Decimal              @default(0.00) @db.Decimal(15, 2)
+  sellPrice          Decimal              @default(0.00) @db.Decimal(15, 2)
+  discountBase       Decimal              @default(0.00) @db.Decimal(15, 2)
+  taxAmountBase      Decimal              @default(0.00) @db.Decimal(15, 2)
+  netSellingBase     Decimal              @default(0.00) @db.Decimal(15, 2)
+  marginAmount       Decimal              @default(0.00) @db.Decimal(15, 2)
+
+  status             ServiceStatus        @default(CONFIRMED)
+  notes              String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  booking            Booking              @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  supplier           Supplier             @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  flightSegments     FlightSegment[]
+  hotelDetail        HotelDetail?
+  visaDetail         VisaDetail?
+  transferDetail     TransferDetail[]
+  invoiceLines       InvoiceLine[]
+  supplierBillLines  SupplierBillLine[]
+
+  @@index([bookingId])
+  @@index([supplierId])
+  @@index([serviceType])
+  @@map("booking_service_items")
+}
+
+model FlightSegment {
+  id                 String             @id @default(uuid())
+  serviceItemId      String
+  airline            String             // e.g. "Kam Air", "Ariana", "FlyDubai"
+  flightNumber       String             // e.g. "RQ-901"
+  departureAirport   String             // e.g. "KBL - Kabul"
+  arrivalAirport     String             // e.g. "DXB - Dubai"
+  departureDateTime  DateTime?
+  arrivalDateTime    DateTime?
+  cabinClass         String?            @default("ECONOMY")
+  ticketNumber       String?
+  pnr                String?
+  baggageAllowance   String?            @default("30 KG")
+  fareBasis          String?
+  isRefundable       Boolean            @default(false)
+  isChangeable       Boolean            @default(true)
+  segmentOrder       Int                @default(1)
+  notes              String?
+  createdAt          DateTime           @default(now())
+
+  serviceItem        BookingServiceItem @relation(fields: [serviceItemId], references: [id], onDelete: Cascade)
+
+  @@index([serviceItemId])
+  @@map("flight_segments")
+}
+
+model HotelDetail {
+  id                 String             @id @default(uuid())
+  serviceItemId      String             @unique
+  hotelName          String
+  city               String             // e.g. "Dubai", "Istanbul", "Jeddah"
+  country            String             @default("UAE")
+  checkInDate        DateTime
+  checkOutDate       DateTime
+  roomType           String?            @default("Standard Room")
+  mealPlan           String?            @default("BB") // RO, BB, HB, FB, AI
+  numberOfRooms      Int                @default(1)
+  numberOfNights     Int                @default(1)
+  confirmationCode   String?
+  isRefundable       Boolean            @default(false)
+  notes              String?
+  createdAt          DateTime           @default(now())
+
+  serviceItem        BookingServiceItem @relation(fields: [serviceItemId], references: [id], onDelete: Cascade)
+
+  @@map("hotel_details")
+}
+
+model VisaDetail {
+  id                 String             @id @default(uuid())
+  serviceItemId      String             @unique
+  visaCountry        String             // e.g. "UAE", "Turkey", "Iran", "Saudi Arabia"
+  visaType           String             // e.g. "Tourist 30 Days", "Business Multiple", "Umrah"
+  entryType          String?            @default("SINGLE") // SINGLE, MULTIPLE
+  processingType     String?            @default("STANDARD") // STANDARD, EXPRESS
+  durationDays       Int?               @default(30)
+  applicantName      String?
+  submissionDate     DateTime?
+  approvalDate       DateTime?
+  visaNumber         String?
+  status             String?            @default("PROCESSING") // DRAFT, SUBMITTED, APPROVED, REJECTED
+  notes              String?
+  createdAt          DateTime           @default(now())
+
+  serviceItem        BookingServiceItem @relation(fields: [serviceItemId], references: [id], onDelete: Cascade)
+
+  @@map("visa_details")
+}
+
+model TransferDetail {
+  id                 String             @id @default(uuid())
+  serviceItemId      String
+  transferType       String             @default("AIRPORT_PICKUP") // AIRPORT_PICKUP, AIRPORT_DROP, INTERCITY, CITY_TOUR
+  vehicleType        String?            @default("SEDAN") // SEDAN, SUV, VAN, MINI_BUS, COACH
+  pickupLocation     String
+  dropoffLocation    String
+  pickupDateTime     DateTime?
+  driverName         String?
+  driverPhone        String?
+  flightNumberRef    String?
+  numberOfPassengers Int                @default(1)
+  luggageCount       Int?               @default(2)
+  notes              String?
+  createdAt          DateTime           @default(now())
+
+  serviceItem        BookingServiceItem @relation(fields: [serviceItemId], references: [id], onDelete: Cascade)
+
+  @@index([serviceItemId])
+  @@map("transfer_details")
+}
+
+// --------------------------------------------------------
+// INVOICES & RECEIPTS (Multi-Currency & Flexible Tax)
+// --------------------------------------------------------
+
+model Invoice {
+  id                 String              @id @default(uuid())
+  invoiceNumber      String              @unique // e.g. INV-2026-000001
+  bookingId          String?
+  customerId         String
+  createdById        String
+  approvedById       String?
+  postedById         String?
+  cancelledById      String?
+  issueDate          DateTime            @default(now())
+  dueDate            DateTime
+  status             InvoiceStatus       @default(DRAFT)
+  approvedAt         DateTime?
+  postedAt           DateTime?
+  cancelledAt        DateTime?
+  cancellationReason String?
+
+  // Multi-Currency Transaction Amounts
+  currency           String              @default("AFN")
+  exchangeRate       Decimal             @default(1.000000) @db.Decimal(18, 6)
+  foreignSubTotal    Decimal             @default(0.00) @db.Decimal(15, 2)
+  baseSubTotal       Decimal             @default(0.00) @db.Decimal(15, 2)
+  discountAmount     Decimal             @default(0.00) @db.Decimal(15, 2)
+  taxableAmount      Decimal             @default(0.00) @db.Decimal(15, 2)
+  taxAmount          Decimal             @default(0.00) @db.Decimal(15, 2)
+  grandTotal         Decimal             @db.Decimal(15, 2)
+  paidAmount         Decimal             @default(0.00) @db.Decimal(15, 2)
+  balanceDue         Decimal             @db.Decimal(15, 2)
+
+  // Base AFN Totals
+  baseGrandTotal     Decimal             @default(0.00) @db.Decimal(15, 2)
+
+  paymentTerms       String?             @default("Net 30 Days")
+  notes              String?
+  terms              String?
+  journalEntryId     String?             @unique
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  booking            Booking?            @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  customer           Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  createdBy          User                @relation("InvoiceCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedBy         User?               @relation("InvoiceApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  postedBy           User?               @relation("InvoicePostedBy", fields: [postedById], references: [id], onDelete: SetNull)
+  cancelledBy        User?               @relation("InvoiceCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  journalEntry       JournalEntry?       @relation("InvoiceJournal", fields: [journalEntryId], references: [id], onDelete: SetNull)
+
+  lines              InvoiceLine[]
+  receiptAllocations ReceiptAllocation[]
+  paymentAllocations SupplierPaymentAllocation[]
+
+  @@index([invoiceNumber])
+  @@index([customerId])
+  @@index([status])
+  @@index([issueDate])
+  @@index([bookingId])
+  @@map("invoices")
+}
+
+model InvoiceLine {
+  id                    String              @id @default(uuid())
+  invoiceId             String
+  bookingServiceItemId  String?
+  serviceType           ServiceType         @default(OTHER)
+  description           String
+  quantity              Int                 @default(1)
+  
+  // Foreign currency unit & totals
+  unitPriceForeign      Decimal             @default(0.00) @db.Decimal(15, 2)
+  unitPriceBase         Decimal             @default(0.00) @db.Decimal(15, 2)
+  discountForeign       Decimal             @default(0.00) @db.Decimal(15, 2)
+  discountBase          Decimal             @default(0.00) @db.Decimal(15, 2)
+  taxRate               Decimal             @default(0.00) @db.Decimal(6, 4)
+  taxAmountForeign      Decimal             @default(0.00) @db.Decimal(15, 2)
+  taxAmountBase         Decimal             @default(0.00) @db.Decimal(15, 2)
+  totalAmountForeign    Decimal             @default(0.00) @db.Decimal(15, 2)
+  totalAmountBase       Decimal             @default(0.00) @db.Decimal(15, 2)
+
+  revenueAccountId      String
+  taxLiabilityAccountId String?
+  createdAt             DateTime            @default(now())
+
+  invoice               Invoice             @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  bookingServiceItem    BookingServiceItem? @relation(fields: [bookingServiceItemId], references: [id], onDelete: SetNull)
+  revenueAccount        ChartOfAccount      @relation("InvoiceRevenueAccount", fields: [revenueAccountId], references: [id], onDelete: Restrict)
+  taxLiabilityAccount   ChartOfAccount?     @relation("InvoiceTaxAccount", fields: [taxLiabilityAccountId], references: [id], onDelete: SetNull)
+
+  @@index([invoiceId])
+  @@index([revenueAccountId])
+  @@map("invoice_lines")
+}
+
+model Receipt {
+  id                 String              @id @default(uuid())
+  receiptNumber      String              @unique // e.g. REC-2026-000001
+  customerId         String
+  bookingId          String?
+  createdById        String
+  approvedById       String?
+  postedById         String?
+  cancelledById      String?
+  paymentDate        DateTime            @default(now())
+  paymentMethod      PaymentMethod       @default(CASH)
+  status             ReceiptStatus       @default(DRAFT)
+  approvedAt         DateTime?
+  postedAt           DateTime?
+  cancelledAt        DateTime?
+  cancellationReason String?
+
+  // Multi-Currency
+  currency           String              @default("AFN")
+  exchangeRate       Decimal             @default(1.000000) @db.Decimal(18, 6)
+  amount             Decimal             @db.Decimal(15, 2)
+  baseAmount         Decimal             @default(0.00) @db.Decimal(15, 2)
+  unallocatedAmount  Decimal             @default(0.00) @db.Decimal(15, 2)
+  unallocatedBase    Decimal             @default(0.00) @db.Decimal(15, 2)
+
+  bankAccountId      String
+  bankReference      String?
+  notes              String?
+  journalEntryId     String?             @unique
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  customer           Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  booking            Booking?            @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  createdBy          User                @relation("ReceiptCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedBy         User?               @relation("ReceiptApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  postedBy           User?               @relation("ReceiptPostedBy", fields: [postedById], references: [id], onDelete: SetNull)
+  cancelledBy        User?               @relation("ReceiptCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  bankAccount        ChartOfAccount      @relation("ReceiptBankAccount", fields: [bankAccountId], references: [id], onDelete: Restrict)
+  journalEntry       JournalEntry?       @relation("ReceiptJournal", fields: [journalEntryId], references: [id], onDelete: SetNull)
+
+  allocations        ReceiptAllocation[]
+
+  @@index([receiptNumber])
+  @@index([customerId])
+  @@index([status])
+  @@index([paymentDate])
+  @@map("receipts")
+}
+
+model ReceiptAllocation {
+  id                 String              @id @default(uuid())
+  receiptId          String
+  invoiceId          String
+  amountForeign      Decimal             @db.Decimal(15, 2)
+  amountBase         Decimal             @db.Decimal(15, 2)
+  invoiceSettledBase Decimal             @db.Decimal(15, 2)
+  fxGainLossAmount   Decimal             @default(0.00) @db.Decimal(15, 2)
+  allocatedAt        DateTime            @default(now())
+  allocatedById      String?
+
+  receipt            Receipt             @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  invoice            Invoice             @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  @@index([receiptId])
+  @@index([invoiceId])
+  @@map("receipt_allocations")
+}
+
+// --------------------------------------------------------
+// SUPPLIER BILLS & ACCOUNTS PAYABLE
+// --------------------------------------------------------
+
+model SupplierBill {
+  id                 String              @id @default(uuid())
+  billNumber         String              @unique // e.g. BIL-2026-000001
+  supplierInvoiceRef String?             // Supplier invoice / invoice reference number
+  supplierId         String
+  bookingId          String?
+  createdById        String
+  approvedById       String?
+  postedById         String?
+  cancelledById      String?
+  billDate           DateTime            @default(now())
+  dueDate            DateTime
+  status             SupplierBillStatus  @default(DRAFT)
+  approvedAt         DateTime?
+  postedAt           DateTime?
+  cancelledAt        DateTime?
+  cancellationReason String?
+
+  // Multi-Currency Transaction Amounts
+  currency           String              @default("AFN")
+  exchangeRate       Decimal             @default(1.000000) @db.Decimal(18, 6)
+  foreignSubTotal    Decimal             @default(0.00) @db.Decimal(15, 2)
+  baseSubTotal       Decimal             @default(0.00) @db.Decimal(15, 2)
+  discountAmount     Decimal             @default(0.00) @db.Decimal(15, 2)
+  taxableAmount      Decimal             @default(0.00) @db.Decimal(15, 2)
+  taxAmount          Decimal             @default(0.00) @db.Decimal(15, 2)
+  grandTotal         Decimal             @db.Decimal(15, 2)
+  paidAmount         Decimal             @default(0.00) @db.Decimal(15, 2)
+  balanceDue         Decimal             @db.Decimal(15, 2)
+
+  // Base AFN Totals
+  baseGrandTotal     Decimal             @default(0.00) @db.Decimal(15, 2)
+
+  paymentTerms       String?             @default("Net 15 Days")
+  notes              String?
+  attachmentPath     String?
+  journalEntryId     String?             @unique
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  supplier           Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  booking            Booking?            @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  createdBy          User                @relation("SupplierBillCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedBy         User?               @relation("SupplierBillApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  postedBy           User?               @relation("SupplierBillPostedBy", fields: [postedById], references: [id], onDelete: SetNull)
+  cancelledBy        User?               @relation("SupplierBillCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  journalEntry       JournalEntry?       @relation("SupplierBillJournal", fields: [journalEntryId], references: [id], onDelete: SetNull)
+
+  lines              SupplierBillLine[]
+  paymentAllocations SupplierPaymentAllocation[]
+
+  @@index([billNumber])
+  @@index([supplierId])
+  @@index([status])
+  @@index([billDate])
+  @@index([bookingId])
+  @@map("supplier_bills")
+}
+
+model SupplierBillLine {
+  id                    String              @id @default(uuid())
+  supplierBillId        String
+  bookingServiceItemId  String?
+  serviceType           ServiceType         @default(OTHER)
+  description           String
+  quantity              Int                 @default(1)
+  
+  // Foreign currency unit & totals
+  unitCostForeign       Decimal             @default(0.00) @db.Decimal(15, 2)
+  unitCostBase          Decimal             @default(0.00) @db.Decimal(15, 2)
+  discountForeign       Decimal             @default(0.00) @db.Decimal(15, 2)
+  discountBase          Decimal             @default(0.00) @db.Decimal(15, 2)
+  taxRate               Decimal             @default(0.00) @db.Decimal(6, 4)
+  taxAmountForeign      Decimal             @default(0.00) @db.Decimal(15, 2)
+  taxAmountBase         Decimal             @default(0.00) @db.Decimal(15, 2)
+  isTaxRecoverable      Boolean             @default(false)
+  totalAmountForeign    Decimal             @default(0.00) @db.Decimal(15, 2)
+  totalAmountBase       Decimal             @default(0.00) @db.Decimal(15, 2)
+
+  costAccountId         String
+  taxLiabilityAccountId String?
+  createdAt             DateTime            @default(now())
+
+  supplierBill          SupplierBill        @relation(fields: [supplierBillId], references: [id], onDelete: Cascade)
+  bookingServiceItem    BookingServiceItem? @relation(fields: [bookingServiceItemId], references: [id], onDelete: SetNull)
+  costAccount           ChartOfAccount      @relation("SupplierBillCostAccount", fields: [costAccountId], references: [id], onDelete: Restrict)
+
+  @@index([supplierBillId])
+  @@index([costAccountId])
+  @@map("supplier_bill_lines")
+}
+
+// --------------------------------------------------------
+// SUPPLIER PAYMENTS & DISBURSEMENTS
+// --------------------------------------------------------
+
+model SupplierPayment {
+  id                 String                      @id @default(uuid())
+  paymentNumber      String                      @unique // e.g. PAY-2026-000001
+  supplierId         String
+  bookingId          String?
+  createdById        String
+  approvedById       String?
+  postedById         String?
+  cancelledById      String?
+  paymentDate        DateTime                    @default(now())
+  paymentMethod      PaymentMethod               @default(BANK_TRANSFER)
+  status             SupplierPaymentStatus       @default(DRAFT)
+  approvedAt         DateTime?
+  postedAt           DateTime?
+  cancelledAt        DateTime?
+  cancellationReason String?
+
+  // Multi-Currency
+  currency           String                      @default("AFN")
+  exchangeRate       Decimal                     @default(1.000000) @db.Decimal(18, 6)
+  amount             Decimal                     @db.Decimal(15, 2)
+  baseAmount         Decimal                     @default(0.00) @db.Decimal(15, 2)
+  unallocatedAmount  Decimal                     @default(0.00) @db.Decimal(15, 2)
+  unallocatedBase    Decimal                     @default(0.00) @db.Decimal(15, 2)
+
+  bankAccountId      String
+  bankReference      String?
+  notes              String?
+  journalEntryId     String?                     @unique
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
+
+  supplier           Supplier                    @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  booking            Booking?                    @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  createdBy          User                        @relation("SupplierPaymentCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedBy         User?                       @relation("SupplierPaymentApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  postedBy           User?                       @relation("SupplierPaymentPostedBy", fields: [postedById], references: [id], onDelete: SetNull)
+  cancelledBy        User?                       @relation("SupplierPaymentCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  bankAccount        ChartOfAccount              @relation("SupplierPaymentBankAccount", fields: [bankAccountId], references: [id], onDelete: Restrict)
+  journalEntry       JournalEntry?               @relation("SupplierPaymentJournal", fields: [journalEntryId], references: [id], onDelete: SetNull)
+
+  allocations        SupplierPaymentAllocation[]
+
+  @@index([paymentNumber])
+  @@index([supplierId])
+  @@index([status])
+  @@index([paymentDate])
+  @@map("supplier_payments")
+}
+
+model SupplierPaymentAllocation {
+  id                 String           @id @default(uuid())
+  supplierPaymentId  String
+  supplierBillId     String?
+  invoiceId          String?
+  amountForeign      Decimal          @db.Decimal(15, 2)
+  amountBase         Decimal          @db.Decimal(15, 2)
+  billSettledBase    Decimal          @db.Decimal(15, 2)
+  fxGainLossAmount   Decimal          @default(0.00) @db.Decimal(15, 2)
+  allocatedAt        DateTime         @default(now())
+  allocatedById      String?
+
+  supplierPayment    SupplierPayment  @relation(fields: [supplierPaymentId], references: [id], onDelete: Cascade)
+  supplierBill       SupplierBill?    @relation(fields: [supplierBillId], references: [id], onDelete: SetNull)
+  invoice            Invoice?         @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  @@index([supplierPaymentId])
+  @@index([supplierBillId])
+  @@map("supplier_payment_allocations")
+}
+
+// --------------------------------------------------------
+// DIRECT OPERATING EXPENSES (Multi-Currency & Line-level)
+// --------------------------------------------------------
+
+model Expense {
+  id                 String           @id @default(uuid())
+  expenseNumber      String           @unique // e.g. EXP-2026-000001
+  payee              String?          // Vendor / Landlord / Staff
+  supplierId         String?          // Optional supplier reference
+  bankAccountId      String           // Bank or Cash account
+  createdById        String
+  approvedById       String?
+  postedById         String?
+  cancelledById      String?
+  expenseDate        DateTime         @default(now())
+  status             ExpenseStatus    @default(DRAFT)
+  approvedAt         DateTime?
+  postedAt           DateTime?
+  cancelledAt        DateTime?
+  cancellationReason String?
+
+  // Multi-Currency
+  currency           String           @default("AFN")
+  exchangeRate       Decimal          @default(1.000000) @db.Decimal(18, 6)
+  amount             Decimal          @db.Decimal(15, 2)
+  baseAmount         Decimal          @default(0.00) @db.Decimal(15, 2)
+
+  paymentMethod      PaymentMethod    @default(CASH)
+  referenceNumber    String?
+  description        String
+  attachmentPath     String?
+  journalEntryId     String?          @unique
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  supplier           Supplier?        @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  bankAccount        ChartOfAccount   @relation("ExpenseBankAccount", fields: [bankAccountId], references: [id], onDelete: Restrict)
+  createdBy          User             @relation("ExpenseCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedBy         User?            @relation("ExpenseApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  postedBy           User?            @relation("ExpensePostedBy", fields: [postedById], references: [id], onDelete: SetNull)
+  cancelledBy        User?            @relation("ExpenseCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  journalEntry       JournalEntry?    @relation("ExpenseJournal", fields: [journalEntryId], references: [id], onDelete: SetNull)
+
+  lines              ExpenseLine[]
+
+  @@index([expenseNumber])
+  @@index([status])
+  @@index([expenseDate])
+  @@map("expenses")
+}
+
+model ExpenseLine {
+  id                 String           @id @default(uuid())
+  expenseId          String
+  expenseAccountId   String           // Linked to 60XX Operating Expense Account
+  description        String
+  amountForeign      Decimal          @db.Decimal(15, 2)
+  amountBase         Decimal          @db.Decimal(15, 2)
+  createdAt          DateTime         @default(now())
+
+  expense            Expense          @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  expenseAccount     ChartOfAccount   @relation("ExpenseAccount", fields: [expenseAccountId], references: [id], onDelete: Restrict)
+
+  @@index([expenseId])
+  @@index([expenseAccountId])
+  @@map("expense_lines")
+}
+
+// --------------------------------------------------------
+// DOCUMENT ATTACHMENTS (Google Cloud Storage)
+// --------------------------------------------------------
+
+model DocumentAttachment {
+  id         String   @id @default(uuid())
+  bookingId  String?
+  entityType String   // "BOOKING", "INVOICE", "RECEIPT", "EXPENSE", "SUPPLIER_BILL", "SUPPLIER"
+  entityId   String
+  fileName   String
+  fileSize   Int
+  mimeType   String
+  gcsPath    String   // gs://travel-accounting-2026-docs/...
+  uploadedBy String
+  createdAt  DateTime @default(now())
+
+  booking    Booking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("document_attachments")
+}
+
+// --------------------------------------------------------
+// AUDIT LOGS (Immutable History)
+// --------------------------------------------------------
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  action     String   // "CREATE", "UPDATE", "DELETE", "CANCEL", "REVERSE", "LOGIN", "EXPORT", "LOCK_PERIOD", "UNLOCK_PERIOD"
+  entityName String   // "User", "CompanySetting", "Customer", "Supplier", "ChartOfAccount", "AccountingPeriod", "TaxConfiguration", "JournalEntry", "SupplierBill", "SupplierPayment", "Expense"
+  entityId   String
+  oldValues  Json?
+  newValues  Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entityName, entityId])
+  @@index([userId, createdAt])
+  @@map("audit_logs")
+}
