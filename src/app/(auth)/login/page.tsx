@@ -1,12 +1,16 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, Suspense } from "react";
 import { loginAction } from "@/app/actions/auth";
-import { useRouter } from "next/navigation";
+import { sanitizeRedirectUrl } from "@/lib/authCommon";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ShieldCheck, Lock, Mail, Loader2, AlertCircle } from "lucide-react";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectPath = searchParams.get("redirect");
+
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -15,14 +19,21 @@ export default function LoginPage() {
     setError(null);
     setIsLoading(true);
 
-    const formData = new FormData(e.currentTarget);
-    const result = await loginAction(null, formData);
+    try {
+      const formData = new FormData(e.currentTarget);
+      const result = await loginAction(null, formData);
 
-    if (result.success) {
-      router.push("/");
-      router.refresh();
-    } else {
-      setError(result.error || "Authentication failed.");
+      if (result.success) {
+        // Safe relative redirect only
+        const targetUrl = sanitizeRedirectUrl(redirectPath);
+        router.push(targetUrl);
+        router.refresh();
+      } else {
+        setError(result.error || "Authentication failed.");
+      }
+    } catch (err: any) {
+      setError(err?.message || "An unexpected error occurred during login. Please try again.");
+    } finally {
       setIsLoading(false);
     }
   }
@@ -107,5 +118,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="text-white text-xs">Loading login...</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }

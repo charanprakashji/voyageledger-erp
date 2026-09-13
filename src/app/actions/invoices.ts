@@ -1,7 +1,7 @@
 "use server";
 
 import prisma from "@/lib/prisma";
-import { getCurrentUser, requireRole } from "@/lib/auth";
+import { getCurrentUser, requireRole, handleActionError } from "@/lib/auth";
 import { recordAuditLog } from "@/lib/audit";
 import {
   calculateInvoiceTotals,
@@ -47,33 +47,33 @@ export async function getInvoices(params?: {
   page?: number;
   limit?: number;
 }) {
-  await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-    UserRole.TRAVEL_AGENT,
-    UserRole.AUDITOR,
-  ]);
-
   const page = Math.max(1, params?.page || 1);
   const limit = Math.min(100, Math.max(1, params?.limit || 20));
   const skip = (page - 1) * limit;
 
-  const where: any = {};
-  if (params?.status) where.status = params.status;
-  if (params?.customerId) where.customerId = params.customerId;
-  if (params?.bookingId) where.bookingId = params.bookingId;
-
-  if (params?.search) {
-    const s = params.search.trim();
-    where.OR = [
-      { invoiceNumber: { contains: s, mode: "insensitive" } },
-      { customer: { name: { contains: s, mode: "insensitive" } } },
-      { customer: { companyName: { contains: s, mode: "insensitive" } } },
-    ];
-  }
-
   try {
+    await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+      UserRole.TRAVEL_AGENT,
+      UserRole.AUDITOR,
+    ]);
+
+    const where: any = {};
+    if (params?.status) where.status = params.status;
+    if (params?.customerId) where.customerId = params.customerId;
+    if (params?.bookingId) where.bookingId = params.bookingId;
+
+    if (params?.search) {
+      const s = params.search.trim();
+      where.OR = [
+        { invoiceNumber: { contains: s, mode: "insensitive" } },
+        { customer: { name: { contains: s, mode: "insensitive" } } },
+        { customer: { companyName: { contains: s, mode: "insensitive" } } },
+      ];
+    }
+
     const [total, invoices] = await Promise.all([
       prisma.invoice.count({ where }),
       prisma.invoice.findMany({
@@ -113,10 +113,10 @@ export async function getInvoices(params?: {
       },
     };
   } catch (error: any) {
-    console.error("Error fetching invoices:", error);
+    const safeErr = handleActionError(error, "Failed to retrieve invoices");
     return {
       success: false,
-      error: error.message || "Failed to retrieve invoices",
+      error: safeErr.error,
       data: [],
       pagination: { total: 0, page: 1, limit, totalPages: 0 },
     };
@@ -124,15 +124,15 @@ export async function getInvoices(params?: {
 }
 
 export async function getInvoiceById(id: string) {
-  await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-    UserRole.TRAVEL_AGENT,
-    UserRole.AUDITOR,
-  ]);
-
   try {
+    await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+      UserRole.TRAVEL_AGENT,
+      UserRole.AUDITOR,
+    ]);
+
     const invoice = await prisma.invoice.findUnique({
       where: { id },
       include: {
@@ -208,28 +208,27 @@ export async function getInvoiceById(id: string) {
       },
     };
   } catch (error: any) {
-    console.error("Error retrieving invoice:", error);
-    return { success: false, error: error.message || "Failed to load invoice" };
+    return handleActionError(error, "Failed to load invoice");
   }
 }
 
 export async function createInvoice(input: CreateInvoiceInput) {
-  const currentUser = await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-    UserRole.TRAVEL_AGENT,
-  ]);
-
-  if (!input.customerId) {
-    return { success: false, error: "Customer is required" };
-  }
-
-  if (!input.lines || input.lines.length === 0) {
-    return { success: false, error: "Invoice must contain at least one line item" };
-  }
-
   try {
+    const currentUser = await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+      UserRole.TRAVEL_AGENT,
+    ]);
+
+    if (!input.customerId) {
+      return { success: false, error: "Customer is required" };
+    }
+
+    if (!input.lines || input.lines.length === 0) {
+      return { success: false, error: "Invoice must contain at least one line item" };
+    }
+
     const settings = await prisma.companySetting.findFirst();
     const prefix = settings?.invoicePrefix || "INV-";
 
@@ -314,21 +313,20 @@ export async function createInvoice(input: CreateInvoiceInput) {
     });
 
     revalidatePath("/invoices");
-    return { success: true, data: { id: newInvoice.id, invoiceNumber: newInvoice.invoiceNumber } };
+    return { success: true as const, data: { id: newInvoice.id, invoiceNumber: newInvoice.invoiceNumber } };
   } catch (error: any) {
-    console.error("Error creating invoice:", error);
-    return { success: false, error: error.message || "Failed to create invoice" };
+    return handleActionError(error, "Failed to create invoice");
   }
 }
 
 export async function approveInvoice(id: string) {
-  const currentUser = await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-  ]);
-
   try {
+    const currentUser = await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+    ]);
+
     const invoice = await prisma.invoice.findUnique({
       where: { id },
       select: { id: true, status: true, invoiceNumber: true },
@@ -358,21 +356,20 @@ export async function approveInvoice(id: string) {
 
     revalidatePath(`/invoices/${id}`);
     revalidatePath("/invoices");
-    return { success: true };
+    return { success: true as const };
   } catch (error: any) {
-    console.error("Error approving invoice:", error);
-    return { success: false, error: error.message || "Failed to approve invoice" };
+    return handleActionError(error, "Failed to approve invoice");
   }
 }
 
 export async function postInvoice(id: string) {
-  const currentUser = await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-  ]);
-
   try {
+    const currentUser = await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+    ]);
+
     const result = await prisma.$transaction(async (tx) => {
       return await postInvoiceToGL(tx, id, currentUser.id);
     });
@@ -393,25 +390,24 @@ export async function postInvoice(id: string) {
     revalidatePath(`/invoices/${id}`);
     revalidatePath("/invoices");
     revalidatePath("/customers");
-    return { success: true, data: result };
+    return { success: true as const, data: result };
   } catch (error: any) {
-    console.error("Error posting invoice:", error);
-    return { success: false, error: error.message || "Failed to post invoice to General Ledger" };
+    return handleActionError(error, "Failed to post invoice to General Ledger");
   }
 }
 
 export async function cancelInvoice(id: string, reason: string) {
-  const currentUser = await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-  ]);
-
-  if (!reason || reason.trim().length < 5) {
-    return { success: false, error: "Detailed cancellation reason is mandatory (minimum 5 characters)" };
-  }
-
   try {
+    const currentUser = await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+    ]);
+
+    if (!reason || reason.trim().length < 5) {
+      return { success: false, error: "Detailed cancellation reason is mandatory (minimum 5 characters)" };
+    }
+
     const invoice = await prisma.invoice.findUnique({
       where: { id },
       select: { id: true, status: true, invoiceNumber: true, journalEntryId: true },
@@ -455,9 +451,8 @@ export async function cancelInvoice(id: string, reason: string) {
     revalidatePath(`/invoices/${id}`);
     revalidatePath("/invoices");
     revalidatePath("/customers");
-    return { success: true };
+    return { success: true as const };
   } catch (error: any) {
-    console.error("Error cancelling invoice:", error);
-    return { success: false, error: error.message || "Failed to cancel invoice" };
+    return handleActionError(error, "Failed to cancel invoice");
   }
 }

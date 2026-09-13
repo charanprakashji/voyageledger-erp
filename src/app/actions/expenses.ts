@@ -1,7 +1,7 @@
 "use server";
 
 import prisma from "@/lib/prisma";
-import { requireRole } from "@/lib/auth";
+import { requireRole, handleActionError } from "@/lib/auth";
 import { recordAuditLog } from "@/lib/audit";
 import {
   calculateExpenseTotals,
@@ -40,29 +40,29 @@ export async function getExpenses(params?: {
   page?: number;
   limit?: number;
 }) {
-  await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-    UserRole.AUDITOR,
-  ]);
-
   const page = Math.max(1, params?.page || 1);
   const limit = Math.min(100, Math.max(1, params?.limit || 20));
   const skip = (page - 1) * limit;
 
-  const where: any = {};
-  if (params?.status) where.status = params.status;
-  if (params?.search) {
-    const s = params.search.trim();
-    where.OR = [
-      { expenseNumber: { contains: s, mode: "insensitive" } },
-      { referenceNumber: { contains: s, mode: "insensitive" } },
-      { supplier: { name: { contains: s, mode: "insensitive" } } },
-    ];
-  }
-
   try {
+    await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+      UserRole.AUDITOR,
+    ]);
+
+    const where: any = {};
+    if (params?.status) where.status = params.status;
+    if (params?.search) {
+      const s = params.search.trim();
+      where.OR = [
+        { expenseNumber: { contains: s, mode: "insensitive" } },
+        { referenceNumber: { contains: s, mode: "insensitive" } },
+        { supplier: { name: { contains: s, mode: "insensitive" } } },
+      ];
+    }
+
     const [total, expenses] = await Promise.all([
       prisma.expense.count({ where }),
       prisma.expense.findMany({
@@ -99,10 +99,10 @@ export async function getExpenses(params?: {
       },
     };
   } catch (error: any) {
-    console.error("Error fetching expenses:", error);
+    const safeErr = handleActionError(error, "Failed to retrieve expenses");
     return {
       success: false,
-      error: error.message || "Failed to retrieve expenses",
+      error: safeErr.error,
       data: [],
       pagination: { total: 0, page: 1, limit, totalPages: 0 },
     };
@@ -110,14 +110,14 @@ export async function getExpenses(params?: {
 }
 
 export async function getExpenseById(id: string) {
-  await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-    UserRole.AUDITOR,
-  ]);
-
   try {
+    await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+      UserRole.AUDITOR,
+    ]);
+
     const expense = await prisma.expense.findUnique({
       where: { id },
       include: {
@@ -159,24 +159,23 @@ export async function getExpenseById(id: string) {
       },
     };
   } catch (error: any) {
-    console.error("Error retrieving expense:", error);
-    return { success: false, error: error.message || "Failed to load expense" };
+    return handleActionError(error, "Failed to load expense");
   }
 }
 
 export async function createExpense(input: CreateExpenseInput) {
-  const currentUser = await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-  ]);
-
-  if (!input.bankAccountId) return { success: false, error: "Bank/Cash account is required" };
-  if (!input.lines || input.lines.length === 0) {
-    return { success: false, error: "At least one expense line is required" };
-  }
-
   try {
+    const currentUser = await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+    ]);
+
+    if (!input.bankAccountId) return { success: false, error: "Bank/Cash account is required" };
+    if (!input.lines || input.lines.length === 0) {
+      return { success: false, error: "At least one expense line is required" };
+    }
+
     const count = await prisma.expense.count();
     const expenseNumber = generateDocumentNumber("EXP-", count + 1);
 
@@ -233,19 +232,18 @@ export async function createExpense(input: CreateExpenseInput) {
     revalidatePath("/expenses");
     return { success: true, data: { id: newExpense.id, expenseNumber: newExpense.expenseNumber } };
   } catch (error: any) {
-    console.error("Error creating expense:", error);
-    return { success: false, error: error.message || "Failed to create expense" };
+    return handleActionError(error, "Failed to create expense");
   }
 }
 
 export async function approveExpense(id: string) {
-  const currentUser = await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-  ]);
-
   try {
+    const currentUser = await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+    ]);
+
     const expense = await prisma.expense.findUnique({
       where: { id },
       select: { id: true, status: true },
@@ -265,23 +263,30 @@ export async function approveExpense(id: string) {
       },
     });
 
+    await recordAuditLog({
+      userId: currentUser.id,
+      action: "UPDATE",
+      entityName: "Expense",
+      entityId: id,
+      newValues: { status: ExpenseStatus.APPROVED, approvedBy: currentUser.name },
+    });
+
     revalidatePath(`/expenses/${id}`);
     revalidatePath("/expenses");
     return { success: true };
   } catch (error: any) {
-    console.error("Error approving expense:", error);
-    return { success: false, error: error.message || "Failed to approve expense" };
+    return handleActionError(error, "Failed to approve expense");
   }
 }
 
 export async function postExpense(id: string) {
-  const currentUser = await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-  ]);
-
   try {
+    const currentUser = await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+    ]);
+
     const result = await prisma.$transaction(async (tx) => {
       return await postExpenseToGL(tx, id, currentUser.id);
     });
@@ -290,23 +295,22 @@ export async function postExpense(id: string) {
     revalidatePath("/expenses");
     return { success: true, data: result };
   } catch (error: any) {
-    console.error("Error posting expense:", error);
-    return { success: false, error: error.message || "Failed to post expense to General Ledger" };
+    return handleActionError(error, "Failed to post expense to General Ledger");
   }
 }
 
 export async function cancelExpense(id: string, reason: string) {
-  const currentUser = await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-  ]);
-
-  if (!reason || reason.trim().length < 5) {
-    return { success: false, error: "Detailed cancellation reason is mandatory" };
-  }
-
   try {
+    const currentUser = await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+    ]);
+
+    if (!reason || reason.trim().length < 5) {
+      return { success: false, error: "Detailed cancellation reason is mandatory" };
+    }
+
     const expense = await prisma.expense.findUnique({
       where: { id },
       select: { id: true, status: true },
@@ -337,7 +341,6 @@ export async function cancelExpense(id: string, reason: string) {
     revalidatePath("/expenses");
     return { success: true };
   } catch (error: any) {
-    console.error("Error cancelling expense:", error);
-    return { success: false, error: error.message || "Failed to cancel expense" };
+    return handleActionError(error, "Failed to cancel expense");
   }
 }

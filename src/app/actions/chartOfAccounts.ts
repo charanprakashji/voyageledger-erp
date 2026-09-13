@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { requireRole } from "@/lib/auth";
+import { requireRole, handleActionError } from "@/lib/auth";
 import { recordAuditLog } from "@/lib/audit";
 import { DEFAULT_CHART_OF_ACCOUNTS } from "@/lib/accounting";
 import { revalidatePath } from "next/cache";
@@ -74,140 +74,154 @@ export async function seedStandardCOA(): Promise<void> {
  * Retrieves Chart of Accounts organized into a hierarchical tree.
  */
 export async function getChartOfAccountsTree(): Promise<AccountTreeNode[]> {
-  await seedStandardCOA();
+  try {
+    await requireRole(["ADMIN", "MANAGER", "ACCOUNTANT", "AUDITOR"]);
+    await seedStandardCOA();
 
-  const allAccounts = await db.chartOfAccount.findMany({
-    orderBy: { code: "asc" },
-    include: {
-      _count: {
-        select: {
-          journalLines: true,
+    const allAccounts = await db.chartOfAccount.findMany({
+      orderBy: { code: "asc" },
+      include: {
+        _count: {
+          select: {
+            journalLines: true,
+          },
         },
       },
-    },
-  });
-
-  const nodeMap = new Map<string, AccountTreeNode>();
-
-  for (const acc of allAccounts) {
-    nodeMap.set(acc.id, {
-      id: acc.id,
-      code: acc.code,
-      name: acc.name,
-      accountType: acc.accountType,
-      normalBalance: acc.normalBalance,
-      parentAccountId: acc.parentAccountId,
-      currency: acc.currency,
-      description: acc.description,
-      isActive: acc.isActive,
-      isSystemAccount: acc.isSystem,
-      journalLineCount: acc._count.journalLines,
-      children: [],
     });
-  }
 
-  const rootNodes: AccountTreeNode[] = [];
+    const nodeMap = new Map<string, AccountTreeNode>();
 
-  for (const node of nodeMap.values()) {
-    if (node.parentAccountId && nodeMap.has(node.parentAccountId)) {
-      nodeMap.get(node.parentAccountId)!.children.push(node);
-    } else {
-      rootNodes.push(node);
+    for (const acc of allAccounts) {
+      nodeMap.set(acc.id, {
+        id: acc.id,
+        code: acc.code,
+        name: acc.name,
+        accountType: acc.accountType,
+        normalBalance: acc.normalBalance,
+        parentAccountId: acc.parentAccountId,
+        currency: acc.currency,
+        description: acc.description,
+        isActive: acc.isActive,
+        isSystemAccount: acc.isSystem,
+        journalLineCount: acc._count.journalLines,
+        children: [],
+      });
     }
-  }
 
-  return rootNodes;
+    const rootNodes: AccountTreeNode[] = [];
+
+    for (const node of nodeMap.values()) {
+      if (node.parentAccountId && nodeMap.has(node.parentAccountId)) {
+        nodeMap.get(node.parentAccountId)!.children.push(node);
+      } else {
+        rootNodes.push(node);
+      }
+    }
+
+    return rootNodes;
+  } catch (err) {
+    console.error("Error in getChartOfAccountsTree:", err);
+    return [];
+  }
 }
 
 export async function createAccount(formData: FormData) {
-  const user = await requireRole(["ADMIN", "ACCOUNTANT"]);
+  try {
+    const user = await requireRole(["ADMIN", "ACCOUNTANT"]);
 
-  const code = formData.get("code")?.toString().trim();
-  const name = formData.get("name")?.toString().trim();
-  const accountType = formData.get("accountType")?.toString() as AccountType;
-  const normalBalance = formData.get("normalBalance")?.toString() as NormalBalance;
-  const parentAccountId = formData.get("parentAccountId")?.toString().trim() || null;
-  const currency = formData.get("currency")?.toString().trim() || "AFN";
-  const description = formData.get("description")?.toString().trim() || null;
+    const code = formData.get("code")?.toString().trim();
+    const name = formData.get("name")?.toString().trim();
+    const accountType = formData.get("accountType")?.toString() as AccountType;
+    const normalBalance = formData.get("normalBalance")?.toString() as NormalBalance;
+    const parentAccountId = formData.get("parentAccountId")?.toString().trim() || null;
+    const currency = formData.get("currency")?.toString().trim() || "AFN";
+    const description = formData.get("description")?.toString().trim() || null;
 
-  if (!code || !name || !accountType || !normalBalance) {
-    return { success: false, error: "Code, Name, Account Type, and Normal Balance are required." };
+    if (!code || !name || !accountType || !normalBalance) {
+      return { success: false, error: "Code, Name, Account Type, and Normal Balance are required." };
+    }
+
+    const existing = await db.chartOfAccount.findUnique({ where: { code } });
+    if (existing) {
+      return { success: false, error: `Account code '${code}' already exists.` };
+    }
+
+    const account = await db.chartOfAccount.create({
+      data: {
+        code,
+        name,
+        accountType,
+        normalBalance,
+        parentAccountId,
+        currency,
+        description,
+        isSystem: false,
+        isActive: true,
+      },
+    });
+
+    await recordAuditLog({
+      userId: user.id,
+      action: "CREATE",
+      entityName: "ChartOfAccount",
+      entityId: account.id,
+      newValues: account,
+    });
+
+    revalidatePath("/accounting/chart-of-accounts");
+    return { success: true, account };
+  } catch (err) {
+    return handleActionError(err, "Failed to create account.");
   }
-
-  const existing = await db.chartOfAccount.findUnique({ where: { code } });
-  if (existing) {
-    return { success: false, error: `Account code '${code}' already exists.` };
-  }
-
-  const account = await db.chartOfAccount.create({
-    data: {
-      code,
-      name,
-      accountType,
-      normalBalance,
-      parentAccountId,
-      currency,
-      description,
-      isSystem: false,
-      isActive: true,
-    },
-  });
-
-  await recordAuditLog({
-    userId: user.id,
-    action: "CREATE",
-    entityName: "ChartOfAccount",
-    entityId: account.id,
-    newValues: account,
-  });
-
-  revalidatePath("/accounting/chart-of-accounts");
-  return { success: true, account };
 }
 
 export async function updateAccount(id: string, formData: FormData) {
-  const user = await requireRole(["ADMIN", "ACCOUNTANT"]);
+  try {
+    const user = await requireRole(["ADMIN", "ACCOUNTANT"]);
 
-  const name = formData.get("name")?.toString().trim();
-  const parentAccountId = formData.get("parentAccountId")?.toString().trim() || null;
-  const description = formData.get("description")?.toString().trim() || null;
-  const isActive = formData.get("isActive") === "true";
+    const name = formData.get("name")?.toString().trim();
+    const parentAccountId = formData.get("parentAccountId")?.toString().trim() || null;
+    const description = formData.get("description")?.toString().trim() || null;
+    const isActive = formData.get("isActive") === "true";
 
-  if (!name) {
-    return { success: false, error: "Account Name is required." };
+    if (!name) {
+      return { success: false, error: "Account Name is required." };
+    }
+
+    const existing = await db.chartOfAccount.findUnique({ where: { id } });
+    if (!existing) {
+      return { success: false, error: "Account not found." };
+    }
+
+    // Prevent setting self as parent
+    if (parentAccountId === id) {
+      return { success: false, error: "An account cannot be its own parent." };
+    }
+
+    const updated = await db.chartOfAccount.update({
+      where: { id },
+      data: {
+        name,
+        parentAccountId,
+        description,
+        isActive,
+      },
+    });
+
+    await recordAuditLog({
+      userId: user.id,
+      action: "UPDATE",
+      entityName: "ChartOfAccount",
+      entityId: id,
+      oldValues: existing,
+      newValues: updated,
+    });
+
+    revalidatePath("/accounting/chart-of-accounts");
+    return { success: true, account: updated };
+  } catch (err) {
+    return handleActionError(err, "Failed to update account.");
   }
-
-  const existing = await db.chartOfAccount.findUnique({ where: { id } });
-  if (!existing) {
-    return { success: false, error: "Account not found." };
-  }
-
-  // Prevent setting self as parent
-  if (parentAccountId === id) {
-    return { success: false, error: "An account cannot be its own parent." };
-  }
-
-  const updated = await db.chartOfAccount.update({
-    where: { id },
-    data: {
-      name,
-      parentAccountId,
-      description,
-      isActive,
-    },
-  });
-
-  await recordAuditLog({
-    userId: user.id,
-    action: "UPDATE",
-    entityName: "ChartOfAccount",
-    entityId: id,
-    oldValues: existing,
-    newValues: updated,
-  });
-
-  revalidatePath("/accounting/chart-of-accounts");
-  return { success: true, account: updated };
 }
 
 /**
@@ -216,55 +230,59 @@ export async function updateAccount(id: string, formData: FormData) {
  * 2. Never allow deletion of accounts with journal history.
  */
 export async function deleteAccount(id: string) {
-  const user = await requireRole(["ADMIN"]);
+  try {
+    const user = await requireRole(["ADMIN"]);
 
-  const existing = await db.chartOfAccount.findUnique({
-    where: { id },
-    include: {
-      _count: {
-        select: {
-          journalLines: true,
-          subAccounts: true,
+    const existing = await db.chartOfAccount.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: {
+            journalLines: true,
+            subAccounts: true,
+          },
         },
       },
-    },
-  });
+    });
 
-  if (!existing) {
-    return { success: false, error: "Account not found." };
+    if (!existing) {
+      return { success: false, error: "Account not found." };
+    }
+
+    if (existing.isSystem) {
+      return {
+        success: false,
+        error: `Cannot delete system account '${existing.code} - ${existing.name}'. Core system accounts are protected.`,
+      };
+    }
+
+    if (existing._count.subAccounts > 0) {
+      return {
+        success: false,
+        error: `Cannot delete account '${existing.code}' because it has ${existing._count.subAccounts} child sub-accounts. Please reassign or delete child accounts first.`,
+      };
+    }
+
+    if (existing._count.journalLines > 0) {
+      return {
+        success: false,
+        error: `Cannot permanently delete account '${existing.code} - ${existing.name}' because it contains ${existing._count.journalLines} posted journal lines. Deactivate the account instead to protect General Ledger auditability.`,
+      };
+    }
+
+    await db.chartOfAccount.delete({ where: { id } });
+
+    await recordAuditLog({
+      userId: user.id,
+      action: "DELETE",
+      entityName: "ChartOfAccount",
+      entityId: id,
+      oldValues: existing,
+    });
+
+    revalidatePath("/accounting/chart-of-accounts");
+    return { success: true };
+  } catch (err) {
+    return handleActionError(err, "Failed to delete account.");
   }
-
-  if (existing.isSystem) {
-    return {
-      success: false,
-      error: `Cannot delete system account '${existing.code} - ${existing.name}'. Core system accounts are protected.`,
-    };
-  }
-
-  if (existing._count.subAccounts > 0) {
-    return {
-      success: false,
-      error: `Cannot delete account '${existing.code}' because it has ${existing._count.subAccounts} child sub-accounts. Please reassign or delete child accounts first.`,
-    };
-  }
-
-  if (existing._count.journalLines > 0) {
-    return {
-      success: false,
-      error: `Cannot permanently delete account '${existing.code} - ${existing.name}' because it contains ${existing._count.journalLines} posted journal lines. Deactivate the account instead to protect General Ledger auditability.`,
-    };
-  }
-
-  await db.chartOfAccount.delete({ where: { id } });
-
-  await recordAuditLog({
-    userId: user.id,
-    action: "DELETE",
-    entityName: "ChartOfAccount",
-    entityId: id,
-    oldValues: existing,
-  });
-
-  revalidatePath("/accounting/chart-of-accounts");
-  return { success: true };
 }

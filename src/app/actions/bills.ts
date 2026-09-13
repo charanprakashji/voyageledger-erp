@@ -1,7 +1,7 @@
 "use server";
 
 import prisma from "@/lib/prisma";
-import { requireRole } from "@/lib/auth";
+import { requireRole, handleActionError } from "@/lib/auth";
 import { recordAuditLog } from "@/lib/audit";
 import {
   calculateSupplierBillTotals,
@@ -52,34 +52,34 @@ export async function getSupplierBills(params?: {
   page?: number;
   limit?: number;
 }) {
-  await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-    UserRole.TRAVEL_AGENT,
-    UserRole.AUDITOR,
-  ]);
-
   const page = Math.max(1, params?.page || 1);
   const limit = Math.min(100, Math.max(1, params?.limit || 20));
   const skip = (page - 1) * limit;
 
-  const where: any = {};
-  if (params?.status) where.status = params.status;
-  if (params?.supplierId) where.supplierId = params.supplierId;
-  if (params?.bookingId) where.bookingId = params.bookingId;
-
-  if (params?.search) {
-    const s = params.search.trim();
-    where.OR = [
-      { billNumber: { contains: s, mode: "insensitive" } },
-      { supplierInvoiceRef: { contains: s, mode: "insensitive" } },
-      { supplier: { name: { contains: s, mode: "insensitive" } } },
-      { supplier: { companyName: { contains: s, mode: "insensitive" } } },
-    ];
-  }
-
   try {
+    await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+      UserRole.TRAVEL_AGENT,
+      UserRole.AUDITOR,
+    ]);
+
+    const where: any = {};
+    if (params?.status) where.status = params.status;
+    if (params?.supplierId) where.supplierId = params.supplierId;
+    if (params?.bookingId) where.bookingId = params.bookingId;
+
+    if (params?.search) {
+      const s = params.search.trim();
+      where.OR = [
+        { billNumber: { contains: s, mode: "insensitive" } },
+        { supplierInvoiceRef: { contains: s, mode: "insensitive" } },
+        { supplier: { name: { contains: s, mode: "insensitive" } } },
+        { supplier: { companyName: { contains: s, mode: "insensitive" } } },
+      ];
+    }
+
     const [total, bills] = await Promise.all([
       prisma.supplierBill.count({ where }),
       prisma.supplierBill.findMany({
@@ -108,6 +108,18 @@ export async function getSupplierBills(params?: {
         balanceDue: Number(b.balanceDue),
         baseGrandTotal: Number(b.baseGrandTotal),
         exchangeRate: Number(b.exchangeRate),
+        lines: b.lines.map((l) => ({
+          ...l,
+          unitCostForeign: Number(l.unitCostForeign),
+          unitCostBase: Number(l.unitCostBase),
+          discountForeign: Number(l.discountForeign),
+          discountBase: Number(l.discountBase),
+          taxRate: Number(l.taxRate),
+          taxAmountForeign: Number(l.taxAmountForeign),
+          taxAmountBase: Number(l.taxAmountBase),
+          totalCostForeign: Number(l.totalAmountForeign),
+          totalCostBase: Number(l.totalAmountBase),
+        })),
       })),
       pagination: {
         total,
@@ -117,10 +129,10 @@ export async function getSupplierBills(params?: {
       },
     };
   } catch (error: any) {
-    console.error("Error fetching supplier bills:", error);
+    const safeErr = handleActionError(error, "Failed to retrieve supplier bills");
     return {
       success: false,
-      error: error.message || "Failed to retrieve supplier bills",
+      error: safeErr.error,
       data: [],
       pagination: { total: 0, page: 1, limit, totalPages: 0 },
     };
@@ -128,15 +140,15 @@ export async function getSupplierBills(params?: {
 }
 
 export async function getSupplierBillById(id: string) {
-  await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-    UserRole.TRAVEL_AGENT,
-    UserRole.AUDITOR,
-  ]);
-
   try {
+    await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+      UserRole.TRAVEL_AGENT,
+      UserRole.AUDITOR,
+    ]);
+
     const bill = await prisma.supplierBill.findUnique({
       where: { id },
       include: {
@@ -208,28 +220,27 @@ export async function getSupplierBillById(id: string) {
       },
     };
   } catch (error: any) {
-    console.error("Error retrieving supplier bill:", error);
-    return { success: false, error: error.message || "Failed to load supplier bill" };
+    return handleActionError(error, "Failed to load supplier bill");
   }
 }
 
 export async function createSupplierBill(input: CreateSupplierBillInput) {
-  const currentUser = await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-    UserRole.TRAVEL_AGENT,
-  ]);
-
-  if (!input.supplierId) {
-    return { success: false, error: "Supplier is required" };
-  }
-
-  if (!input.lines || input.lines.length === 0) {
-    return { success: false, error: "Supplier Bill must contain at least one line item" };
-  }
-
   try {
+    const currentUser = await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+      UserRole.TRAVEL_AGENT,
+    ]);
+
+    if (!input.supplierId) {
+      return { success: false, error: "Supplier is required" };
+    }
+
+    if (!input.lines || input.lines.length === 0) {
+      return { success: false, error: "Supplier Bill must contain at least one line item" };
+    }
+
     const prefix = "BIL-";
 
     const count = await prisma.supplierBill.count();
@@ -312,19 +323,18 @@ export async function createSupplierBill(input: CreateSupplierBillInput) {
     revalidatePath("/supplier-bills");
     return { success: true, data: { id: newBill.id, billNumber: newBill.billNumber } };
   } catch (error: any) {
-    console.error("Error creating supplier bill:", error);
-    return { success: false, error: error.message || "Failed to create supplier bill" };
+    return handleActionError(error, "Failed to create supplier bill");
   }
 }
 
 export async function approveSupplierBill(id: string) {
-  const currentUser = await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-  ]);
-
   try {
+    const currentUser = await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+    ]);
+
     const bill = await prisma.supplierBill.findUnique({
       where: { id },
       select: { id: true, status: true, billNumber: true },
@@ -356,19 +366,18 @@ export async function approveSupplierBill(id: string) {
     revalidatePath("/supplier-bills");
     return { success: true };
   } catch (error: any) {
-    console.error("Error approving supplier bill:", error);
-    return { success: false, error: error.message || "Failed to approve supplier bill" };
+    return handleActionError(error, "Failed to approve supplier bill");
   }
 }
 
 export async function postSupplierBill(id: string) {
-  const currentUser = await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-  ]);
-
   try {
+    const currentUser = await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+    ]);
+
     const result = await prisma.$transaction(async (tx) => {
       return await postSupplierBillToGL(tx, id, currentUser.id);
     });
@@ -391,23 +400,22 @@ export async function postSupplierBill(id: string) {
     revalidatePath("/suppliers");
     return { success: true, data: result };
   } catch (error: any) {
-    console.error("Error posting supplier bill:", error);
-    return { success: false, error: error.message || "Failed to post supplier bill to General Ledger" };
+    return handleActionError(error, "Failed to post supplier bill to General Ledger");
   }
 }
 
 export async function cancelSupplierBill(id: string, reason: string) {
-  const currentUser = await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-  ]);
-
-  if (!reason || reason.trim().length < 5) {
-    return { success: false, error: "Detailed cancellation reason is mandatory (minimum 5 characters)" };
-  }
-
   try {
+    const currentUser = await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+    ]);
+
+    if (!reason || reason.trim().length < 5) {
+      return { success: false, error: "Detailed cancellation reason is mandatory (minimum 5 characters)" };
+    }
+
     const bill = await prisma.supplierBill.findUnique({
       where: { id },
       select: { id: true, status: true, billNumber: true },
@@ -451,8 +459,7 @@ export async function cancelSupplierBill(id: string, reason: string) {
     revalidatePath("/suppliers");
     return { success: true };
   } catch (error: any) {
-    console.error("Error cancelling supplier bill:", error);
-    return { success: false, error: error.message || "Failed to cancel supplier bill" };
+    return handleActionError(error, "Failed to cancel supplier bill");
   }
 }
 
@@ -481,23 +488,23 @@ export async function getSupplierPayments(params?: {
   page?: number;
   limit?: number;
 }) {
-  await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-    UserRole.TRAVEL_AGENT,
-    UserRole.AUDITOR,
-  ]);
-
   const page = Math.max(1, params?.page || 1);
   const limit = Math.min(100, Math.max(1, params?.limit || 20));
   const skip = (page - 1) * limit;
 
-  const where: any = {};
-  if (params?.status) where.status = params.status;
-  if (params?.supplierId) where.supplierId = params.supplierId;
-
   try {
+    await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+      UserRole.TRAVEL_AGENT,
+      UserRole.AUDITOR,
+    ]);
+
+    const where: any = {};
+    if (params?.status) where.status = params.status;
+    if (params?.supplierId) where.supplierId = params.supplierId;
+
     const [total, payments] = await Promise.all([
       prisma.supplierPayment.count({ where }),
       prisma.supplierPayment.findMany({
@@ -535,10 +542,10 @@ export async function getSupplierPayments(params?: {
       },
     };
   } catch (error: any) {
-    console.error("Error fetching supplier payments:", error);
+    const safeErr = handleActionError(error, "Failed to retrieve supplier payments");
     return {
       success: false,
-      error: error.message || "Failed to retrieve supplier payments",
+      error: safeErr.error,
       data: [],
       pagination: { total: 0, page: 1, limit, totalPages: 0 },
     };
@@ -546,19 +553,19 @@ export async function getSupplierPayments(params?: {
 }
 
 export async function createSupplierPayment(input: CreateSupplierPaymentInput) {
-  const currentUser = await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-  ]);
-
-  if (!input.supplierId) return { success: false, error: "Supplier is required" };
-  if (!input.bankAccountId) return { success: false, error: "Bank/Cash account is required" };
-  if (!input.amountForeign || Number(input.amountForeign) <= 0) {
-    return { success: false, error: "Valid payment amount is required" };
-  }
-
   try {
+    const currentUser = await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+    ]);
+
+    if (!input.supplierId) return { success: false, error: "Supplier is required" };
+    if (!input.bankAccountId) return { success: false, error: "Bank/Cash account is required" };
+    if (!input.amountForeign || Number(input.amountForeign) <= 0) {
+      return { success: false, error: "Valid payment amount is required" };
+    }
+
     const count = await prisma.supplierPayment.count();
     const paymentNumber = generateDocumentNumber("PAY-", count + 1);
 
@@ -620,19 +627,18 @@ export async function createSupplierPayment(input: CreateSupplierPaymentInput) {
     revalidatePath("/supplier-bills");
     return { success: true, data: { id: newPayment.id, paymentNumber: newPayment.paymentNumber } };
   } catch (error: any) {
-    console.error("Error creating supplier payment:", error);
-    return { success: false, error: error.message || "Failed to create supplier payment" };
+    return handleActionError(error, "Failed to create supplier payment");
   }
 }
 
 export async function postSupplierPayment(id: string) {
-  const currentUser = await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-  ]);
-
   try {
+    const currentUser = await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+    ]);
+
     const result = await prisma.$transaction(async (tx) => {
       return await postSupplierPaymentToGL(tx, id, currentUser.id);
     });
@@ -656,23 +662,22 @@ export async function postSupplierPayment(id: string) {
     revalidatePath("/suppliers");
     return { success: true, data: result };
   } catch (error: any) {
-    console.error("Error posting supplier payment:", error);
-    return { success: false, error: error.message || "Failed to post supplier payment to General Ledger" };
+    return handleActionError(error, "Failed to post supplier payment to General Ledger");
   }
 }
 
 export async function cancelSupplierPayment(id: string, reason: string) {
-  const currentUser = await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-  ]);
-
-  if (!reason || reason.trim().length < 5) {
-    return { success: false, error: "Detailed cancellation reason is mandatory" };
-  }
-
   try {
+    const currentUser = await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+    ]);
+
+    if (!reason || reason.trim().length < 5) {
+      return { success: false, error: "Detailed cancellation reason is mandatory" };
+    }
+
     const payment = await prisma.supplierPayment.findUnique({
       where: { id },
       select: { id: true, status: true },
@@ -703,8 +708,7 @@ export async function cancelSupplierPayment(id: string, reason: string) {
     revalidatePath("/supplier-bills");
     return { success: true };
   } catch (error: any) {
-    console.error("Error cancelling supplier payment:", error);
-    return { success: false, error: error.message || "Failed to cancel supplier payment" };
+    return handleActionError(error, "Failed to cancel supplier payment");
   }
 }
 
@@ -713,13 +717,13 @@ export async function allocateSupplierAdvance(
   supplierBillId: string,
   amountForeign: number | string
 ) {
-  const currentUser = await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-  ]);
-
   try {
+    const currentUser = await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+    ]);
+
     const result = await prisma.$transaction(async (tx) => {
       return await allocateSupplierAdvanceToBill(tx, {
         paymentId: supplierPaymentId,
@@ -734,7 +738,6 @@ export async function allocateSupplierAdvance(
     revalidatePath("/suppliers");
     return { success: true, data: result };
   } catch (error: any) {
-    console.error("Error allocating supplier advance:", error);
-    return { success: false, error: error.message || "Failed to allocate supplier advance" };
+    return handleActionError(error, "Failed to allocate supplier advance");
   }
 }

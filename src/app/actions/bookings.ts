@@ -1,7 +1,7 @@
 "use server";
 
 import prisma from "@/lib/prisma";
-import { getCurrentUser, requireRole } from "@/lib/auth";
+import { getCurrentUser, requireRole, handleActionError } from "@/lib/auth";
 import { recordAuditLog } from "@/lib/audit";
 import {
   calculateServicePrices,
@@ -136,71 +136,71 @@ export async function getBookings(params?: {
   page?: number;
   limit?: number;
 }) {
-  await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-    UserRole.TRAVEL_AGENT,
-    UserRole.AUDITOR,
-  ]);
-
-  const page = Math.max(1, params?.page || 1);
   const limit = Math.min(100, Math.max(1, params?.limit || 20));
+  const page = Math.max(1, params?.page || 1);
   const skip = (page - 1) * limit;
 
-  const where: any = {};
+  try {
+    await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+      UserRole.TRAVEL_AGENT,
+      UserRole.AUDITOR,
+    ]);
 
-  if (params?.status) {
-    where.status = params.status;
-  }
+    const where: any = {};
 
-  if (params?.customerId) {
-    where.customerId = params.customerId;
-  }
-
-  if (params?.supplierId || params?.serviceType) {
-    where.serviceItems = {
-      some: {
-        ...(params?.supplierId ? { supplierId: params.supplierId } : {}),
-        ...(params?.serviceType ? { serviceType: params.serviceType } : {}),
-      },
-    };
-  }
-
-  if (params?.fromDate || params?.toDate) {
-    where.travelStartDate = {};
-    if (params?.fromDate) {
-      where.travelStartDate.gte = new Date(params.fromDate);
+    if (params?.status) {
+      where.status = params.status;
     }
-    if (params?.toDate) {
-      where.travelStartDate.lte = new Date(params.toDate);
-    }
-  }
 
-  if (params?.search) {
-    const s = params.search.trim();
-    where.OR = [
-      { bookingNumber: { contains: s, mode: "insensitive" } },
-      { pnrOrRef: { contains: s, mode: "insensitive" } },
-      { confirmationNumber: { contains: s, mode: "insensitive" } },
-      { destination: { contains: s, mode: "insensitive" } },
-      { customer: { name: { contains: s, mode: "insensitive" } } },
-      { customer: { companyName: { contains: s, mode: "insensitive" } } },
-      {
-        passengers: {
-          some: {
-            OR: [
-              { firstName: { contains: s, mode: "insensitive" } },
-              { lastName: { contains: s, mode: "insensitive" } },
-              { passportNumber: { contains: s, mode: "insensitive" } },
-            ],
+    if (params?.customerId) {
+      where.customerId = params.customerId;
+    }
+
+    if (params?.supplierId || params?.serviceType) {
+      where.serviceItems = {
+        some: {
+          ...(params?.supplierId ? { supplierId: params.supplierId } : {}),
+          ...(params?.serviceType ? { serviceType: params.serviceType } : {}),
+        },
+      };
+    }
+
+    if (params?.fromDate || params?.toDate) {
+      where.travelStartDate = {};
+      if (params?.fromDate) {
+        where.travelStartDate.gte = new Date(params.fromDate);
+      }
+      if (params?.toDate) {
+        where.travelStartDate.lte = new Date(params.toDate);
+      }
+    }
+
+    if (params?.search) {
+      const s = params.search.trim();
+      where.OR = [
+        { bookingNumber: { contains: s, mode: "insensitive" } },
+        { pnrOrRef: { contains: s, mode: "insensitive" } },
+        { confirmationNumber: { contains: s, mode: "insensitive" } },
+        { destination: { contains: s, mode: "insensitive" } },
+        { customer: { name: { contains: s, mode: "insensitive" } } },
+        { customer: { companyName: { contains: s, mode: "insensitive" } } },
+        {
+          passengers: {
+            some: {
+              OR: [
+                { firstName: { contains: s, mode: "insensitive" } },
+                { lastName: { contains: s, mode: "insensitive" } },
+                { passportNumber: { contains: s, mode: "insensitive" } },
+              ],
+            },
           },
         },
-      },
-    ];
-  }
+      ];
+    }
 
-  try {
     const [total, bookings] = await Promise.all([
       prisma.booking.count({ where }),
       prisma.booking.findMany({
@@ -261,10 +261,10 @@ export async function getBookings(params?: {
       },
     };
   } catch (error: any) {
-    console.error("Error fetching bookings:", error);
+    const safeError = handleActionError(error, "Failed to retrieve bookings");
     return {
       success: false,
-      error: error.message || "Failed to retrieve bookings",
+      error: safeError.error,
       data: [],
       pagination: { total: 0, page: 1, limit, totalPages: 0 },
     };
@@ -275,15 +275,15 @@ export async function getBookings(params?: {
  * Fetch single booking with full passenger and multi-service breakdown
  */
 export async function getBookingById(id: string) {
-  await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-    UserRole.TRAVEL_AGENT,
-    UserRole.AUDITOR,
-  ]);
-
   try {
+    await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+      UserRole.TRAVEL_AGENT,
+      UserRole.AUDITOR,
+    ]);
+
     const booking = await prisma.booking.findUnique({
       where: { id },
       include: {
@@ -344,8 +344,7 @@ export async function getBookingById(id: string) {
       },
     };
   } catch (error: any) {
-    console.error("Error retrieving booking:", error);
-    return { success: false, error: error.message || "Failed to load booking details" };
+    return handleActionError(error, "Failed to load booking details");
   }
 }
 
@@ -353,29 +352,28 @@ export async function getBookingById(id: string) {
  * Create a new Booking with passengers and multi-currency service items
  */
 export async function createBooking(input: CreateBookingInput) {
-  const currentUser = await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.TRAVEL_AGENT,
-  ]);
-
-  if (!input.customerId) {
-    return { success: false, error: "Customer selection is required" };
-  }
-
-  if (!input.travelStartDate) {
-    return { success: false, error: "Travel start date is required" };
-  }
-
-  if (!input.passengers || input.passengers.length === 0) {
-    return { success: false, error: "At least one passenger is required for a booking" };
-  }
-
-  if (!input.serviceItems || input.serviceItems.length === 0) {
-    return { success: false, error: "At least one travel service item is required" };
-  }
-
   try {
+    const currentUser = await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.TRAVEL_AGENT,
+    ]);
+
+    if (!input.customerId) {
+      return { success: false, error: "Customer selection is required" };
+    }
+
+    if (!input.travelStartDate) {
+      return { success: false, error: "Travel start date is required" };
+    }
+
+    if (!input.passengers || input.passengers.length === 0) {
+      return { success: false, error: "At least one passenger is required for a booking" };
+    }
+
+    if (!input.serviceItems || input.serviceItems.length === 0) {
+      return { success: false, error: "At least one travel service item is required" };
+    }
     // 1. Verify customer exists
     const customer = await prisma.customer.findUnique({
       where: { id: input.customerId },
@@ -589,8 +587,7 @@ export async function createBooking(input: CreateBookingInput) {
     revalidatePath("/bookings");
     return { success: true, data: { id: newBooking.id, bookingNumber: newBooking.bookingNumber } };
   } catch (error: any) {
-    console.error("Error creating booking:", error);
-    return { success: false, error: error.message || "Failed to create booking" };
+    return handleActionError(error, "Failed to create booking");
   }
 }
 
@@ -598,13 +595,13 @@ export async function createBooking(input: CreateBookingInput) {
  * Update an existing booking
  */
 export async function updateBooking(input: UpdateBookingInput) {
-  const currentUser = await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.TRAVEL_AGENT,
-  ]);
-
   try {
+    const currentUser = await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.TRAVEL_AGENT,
+    ]);
+
     const existing = await prisma.booking.findUnique({
       where: { id: input.id },
       include: { serviceItems: true, passengers: true },
@@ -807,8 +804,7 @@ export async function updateBooking(input: UpdateBookingInput) {
     revalidatePath("/bookings");
     return { success: true, data: { id: input.id } };
   } catch (error: any) {
-    console.error("Error updating booking:", error);
-    return { success: false, error: error.message || "Failed to update booking" };
+    return handleActionError(error, "Failed to update booking");
   }
 }
 
@@ -816,13 +812,13 @@ export async function updateBooking(input: UpdateBookingInput) {
  * Update booking status with validation transition check
  */
 export async function updateBookingStatus(id: string, newStatus: BookingStatus) {
-  const currentUser = await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.TRAVEL_AGENT,
-  ]);
-
   try {
+    const currentUser = await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.TRAVEL_AGENT,
+    ]);
+
     const booking = await prisma.booking.findUnique({
       where: { id },
       select: { id: true, status: true, bookingNumber: true, totalNetSelling: true },
@@ -858,8 +854,7 @@ export async function updateBookingStatus(id: string, newStatus: BookingStatus) 
     revalidatePath("/bookings");
     return { success: true };
   } catch (error: any) {
-    console.error("Error updating booking status:", error);
-    return { success: false, error: error.message || "Failed to update status" };
+    return handleActionError(error, "Failed to update status");
   }
 }
 
@@ -867,17 +862,17 @@ export async function updateBookingStatus(id: string, newStatus: BookingStatus) 
  * Cancel a booking with mandatory cancellation reason
  */
 export async function cancelBooking(id: string, reason: string) {
-  const currentUser = await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.TRAVEL_AGENT,
-  ]);
-
-  if (!reason || reason.trim().length < 5) {
-    return { success: false, error: "A detailed cancellation reason is mandatory (minimum 5 characters)" };
-  }
-
   try {
+    const currentUser = await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.TRAVEL_AGENT,
+    ]);
+
+    if (!reason || reason.trim().length < 5) {
+      return { success: false, error: "A detailed cancellation reason is mandatory (minimum 5 characters)" };
+    }
+
     const booking = await prisma.booking.findUnique({
       where: { id },
       select: { id: true, status: true, bookingNumber: true, totalNetSelling: true },
@@ -918,7 +913,6 @@ export async function cancelBooking(id: string, reason: string) {
     revalidatePath("/bookings");
     return { success: true };
   } catch (error: any) {
-    console.error("Error cancelling booking:", error);
-    return { success: false, error: error.message || "Failed to cancel booking" };
+    return handleActionError(error, "Failed to cancel booking");
   }
 }

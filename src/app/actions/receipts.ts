@@ -1,7 +1,7 @@
 "use server";
 
 import prisma from "@/lib/prisma";
-import { getCurrentUser, requireRole } from "@/lib/auth";
+import { getCurrentUser, requireRole, handleActionError } from "@/lib/auth";
 import { recordAuditLog } from "@/lib/audit";
 import {
   generateDocumentNumber,
@@ -41,32 +41,32 @@ export async function getReceipts(params?: {
   page?: number;
   limit?: number;
 }) {
-  await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-    UserRole.TRAVEL_AGENT,
-    UserRole.AUDITOR,
-  ]);
-
   const page = Math.max(1, params?.page || 1);
   const limit = Math.min(100, Math.max(1, params?.limit || 20));
   const skip = (page - 1) * limit;
 
-  const where: any = {};
-  if (params?.status) where.status = params.status;
-  if (params?.customerId) where.customerId = params.customerId;
-
-  if (params?.search) {
-    const s = params.search.trim();
-    where.OR = [
-      { receiptNumber: { contains: s, mode: "insensitive" } },
-      { bankReference: { contains: s, mode: "insensitive" } },
-      { customer: { name: { contains: s, mode: "insensitive" } } },
-    ];
-  }
-
   try {
+    await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+      UserRole.TRAVEL_AGENT,
+      UserRole.AUDITOR,
+    ]);
+
+    const where: any = {};
+    if (params?.status) where.status = params.status;
+    if (params?.customerId) where.customerId = params.customerId;
+
+    if (params?.search) {
+      const s = params.search.trim();
+      where.OR = [
+        { receiptNumber: { contains: s, mode: "insensitive" } },
+        { bankReference: { contains: s, mode: "insensitive" } },
+        { customer: { name: { contains: s, mode: "insensitive" } } },
+      ];
+    }
+
     const [total, receipts] = await Promise.all([
       prisma.receipt.count({ where }),
       prisma.receipt.findMany({
@@ -112,10 +112,10 @@ export async function getReceipts(params?: {
       },
     };
   } catch (error: any) {
-    console.error("Error fetching receipts:", error);
+    const safeErr = handleActionError(error, "Failed to retrieve receipts");
     return {
       success: false,
-      error: error.message || "Failed to retrieve receipts",
+      error: safeErr.error,
       data: [],
       pagination: { total: 0, page: 1, limit, totalPages: 0 },
     };
@@ -123,15 +123,15 @@ export async function getReceipts(params?: {
 }
 
 export async function getReceiptById(id: string) {
-  await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-    UserRole.TRAVEL_AGENT,
-    UserRole.AUDITOR,
-  ]);
-
   try {
+    await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+      UserRole.TRAVEL_AGENT,
+      UserRole.AUDITOR,
+    ]);
+
     const receipt = await prisma.receipt.findUnique({
       where: { id },
       include: {
@@ -180,36 +180,35 @@ export async function getReceiptById(id: string) {
       },
     };
   } catch (error: any) {
-    console.error("Error retrieving receipt:", error);
-    return { success: false, error: error.message || "Failed to load receipt" };
+    return handleActionError(error, "Failed to load receipt");
   }
 }
 
 export async function createReceipt(input: CreateReceiptInput) {
-  const currentUser = await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-    UserRole.TRAVEL_AGENT,
-  ]);
-
-  if (!input.customerId) {
-    return { success: false, error: "Customer selection is required" };
-  }
-
-  const receiptAmount = new Decimal(input.amount || 0);
-  if (receiptAmount.lte(0)) {
-    return { success: false, error: "Receipt amount must be strictly greater than 0" };
-  }
-
-  const rate = new Decimal(input.exchangeRate || 1);
-  if (rate.lte(0)) {
-    return { success: false, error: "Exchange rate must be strictly positive" };
-  }
-
-  const baseAmount = receiptAmount.times(rate).toDecimalPlaces(2);
-
   try {
+    const currentUser = await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+      UserRole.TRAVEL_AGENT,
+    ]);
+
+    if (!input.customerId) {
+      return { success: false, error: "Customer selection is required" };
+    }
+
+    const receiptAmount = new Decimal(input.amount || 0);
+    if (receiptAmount.lte(0)) {
+      return { success: false, error: "Receipt amount must be strictly greater than 0" };
+    }
+
+    const rate = new Decimal(input.exchangeRate || 1);
+    if (rate.lte(0)) {
+      return { success: false, error: "Exchange rate must be strictly positive" };
+    }
+
+    const baseAmount = receiptAmount.times(rate).toDecimalPlaces(2);
+
     const settings = await prisma.companySetting.findFirst();
     const prefix = settings?.receiptPrefix || "REC-";
 
@@ -311,21 +310,20 @@ export async function createReceipt(input: CreateReceiptInput) {
     });
 
     revalidatePath("/receipts");
-    return { success: true, data: { id: newReceipt.id, receiptNumber: newReceipt.receiptNumber } };
+    return { success: true as const, data: { id: newReceipt.id, receiptNumber: newReceipt.receiptNumber } };
   } catch (error: any) {
-    console.error("Error creating receipt:", error);
-    return { success: false, error: error.message || "Failed to create receipt" };
+    return handleActionError(error, "Failed to create receipt");
   }
 }
 
 export async function approveReceipt(id: string) {
-  const currentUser = await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-  ]);
-
   try {
+    const currentUser = await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+    ]);
+
     const receipt = await prisma.receipt.findUnique({
       where: { id },
       select: { id: true, status: true, receiptNumber: true },
@@ -355,21 +353,20 @@ export async function approveReceipt(id: string) {
 
     revalidatePath(`/receipts/${id}`);
     revalidatePath("/receipts");
-    return { success: true };
+    return { success: true as const };
   } catch (error: any) {
-    console.error("Error approving receipt:", error);
-    return { success: false, error: error.message || "Failed to approve receipt" };
+    return handleActionError(error, "Failed to approve receipt");
   }
 }
 
 export async function postReceipt(id: string) {
-  const currentUser = await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-  ]);
-
   try {
+    const currentUser = await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+    ]);
+
     const result = await prisma.$transaction(async (tx) => {
       return await postReceiptToGL(tx, id, currentUser.id);
     });
@@ -391,25 +388,24 @@ export async function postReceipt(id: string) {
     revalidatePath("/receipts");
     revalidatePath("/invoices");
     revalidatePath("/customers");
-    return { success: true, data: result };
+    return { success: true as const, data: result };
   } catch (error: any) {
-    console.error("Error posting receipt:", error);
-    return { success: false, error: error.message || "Failed to post receipt to General Ledger" };
+    return handleActionError(error, "Failed to post receipt to General Ledger");
   }
 }
 
 export async function cancelReceipt(id: string, reason: string) {
-  const currentUser = await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-  ]);
-
-  if (!reason || reason.trim().length < 5) {
-    return { success: false, error: "Detailed cancellation reason is required (minimum 5 characters)" };
-  }
-
   try {
+    const currentUser = await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+    ]);
+
+    if (!reason || reason.trim().length < 5) {
+      return { success: false, error: "Detailed cancellation reason is required (minimum 5 characters)" };
+    }
+
     const receipt = await prisma.receipt.findUnique({
       where: { id },
       select: { id: true, status: true, receiptNumber: true, journalEntryId: true },
@@ -452,10 +448,9 @@ export async function cancelReceipt(id: string, reason: string) {
     revalidatePath("/receipts");
     revalidatePath("/invoices");
     revalidatePath("/customers");
-    return { success: true };
+    return { success: true as const };
   } catch (error: any) {
-    console.error("Error cancelling receipt:", error);
-    return { success: false, error: error.message || "Failed to cancel receipt" };
+    return handleActionError(error, "Failed to cancel receipt");
   }
 }
 
@@ -464,13 +459,13 @@ export async function allocateCustomerAdvanceAction(input: {
   invoiceId: string;
   amountForeign: number | string;
 }) {
-  const currentUser = await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-  ]);
-
   try {
+    const currentUser = await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+    ]);
+
     const result = await prisma.$transaction(async (tx) => {
       return await allocateCustomerAdvanceToInvoice(tx, {
         receiptId: input.receiptId,
@@ -498,10 +493,9 @@ export async function allocateCustomerAdvanceAction(input: {
     revalidatePath("/invoices");
     revalidatePath("/receipts");
     revalidatePath("/customers");
-    return { success: true, data: result };
+    return { success: true as const, data: result };
   } catch (error: any) {
-    console.error("Error allocating customer advance:", error);
-    return { success: false, error: error.message || "Failed to allocate customer advance" };
+    return handleActionError(error, "Failed to allocate customer advance");
   }
 }
 
@@ -509,17 +503,17 @@ export async function reverseCustomerAdvanceAllocationAction(
   allocationId: string,
   reason: string
 ) {
-  const currentUser = await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.ACCOUNTANT,
-  ]);
-
-  if (!reason || reason.trim().length < 5) {
-    return { success: false, error: "Detailed cancellation reason is required (minimum 5 characters)" };
-  }
-
   try {
+    const currentUser = await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.ACCOUNTANT,
+    ]);
+
+    if (!reason || reason.trim().length < 5) {
+      return { success: false, error: "Detailed cancellation reason is required (minimum 5 characters)" };
+    }
+
     const result = await prisma.$transaction(async (tx) => {
       return await reverseAdvanceAllocationGL(tx, allocationId, reason.trim(), currentUser.id);
     });
@@ -538,9 +532,8 @@ export async function reverseCustomerAdvanceAllocationAction(
     revalidatePath("/invoices");
     revalidatePath("/receipts");
     revalidatePath("/customers");
-    return { success: true, data: result };
+    return { success: true as const, data: result };
   } catch (error: any) {
-    console.error("Error reversing advance allocation:", error);
-    return { success: false, error: error.message || "Failed to reverse advance allocation" };
+    return handleActionError(error, "Failed to reverse advance allocation");
   }
 }

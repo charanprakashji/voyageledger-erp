@@ -2,16 +2,95 @@ import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import { UserRole } from "@prisma/client";
+import {
+  SessionUser,
+  SESSION_COOKIE_NAME,
+  SESSION_MAX_AGE_MS,
+  sanitizeRedirectUrl,
+} from "./authCommon";
 
-export interface SessionUser {
-  id: string;
-  email: string;
-  name: string;
-  role: UserRole;
-  status: "ACTIVE" | "INACTIVE" | "SUSPENDED";
+export {
+  type SessionUser,
+  SESSION_COOKIE_NAME,
+  SESSION_MAX_AGE_MS,
+  sanitizeRedirectUrl,
+};
+
+export function parseSessionCookie(cookieValue?: string | null): SessionUser | null {
+  if (!cookieValue) return null;
+  try {
+    const decoded = Buffer.from(cookieValue, "base64").toString("utf-8");
+    const parsed = JSON.parse(decoded) as SessionUser & { createdAt?: number };
+    if (parsed && parsed.id && parsed.role) {
+      if (parsed.createdAt && typeof parsed.createdAt === "number") {
+        if (Date.now() - parsed.createdAt > SESSION_MAX_AGE_MS) {
+          return null; // Expired session
+        }
+      }
+      return {
+        id: parsed.id,
+        email: parsed.email,
+        name: parsed.name,
+        role: parsed.role,
+        status: parsed.status,
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
-const SESSION_COOKIE_NAME = "voyage_ledger_session";
+/**
+ * Standardized, safe error handler for server actions.
+ * Guarantees that sensitive database errors, Prisma exceptions, SQL queries,
+ * credentials, and stack traces are NOT leaked to the client.
+ */
+export function handleActionError(
+  error: unknown,
+  fallbackMessage = "An unexpected server error occurred. Please try again later."
+): { success: false; error: string } {
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (message.startsWith("UNAUTHORIZED")) {
+    return {
+      success: false,
+      error: "UNAUTHORIZED: Authentication required. Please sign in.",
+    };
+  }
+
+  if (message.startsWith("FORBIDDEN")) {
+    return {
+      success: false,
+      error: message.includes("inactive or suspended")
+        ? "FORBIDDEN: User account is inactive or suspended."
+        : "FORBIDDEN: You do not have permission to perform this action.",
+    };
+  }
+
+  const isSensitiveInternalError =
+    message.includes("PrismaClient") ||
+    message.includes("invocation:") ||
+    message.includes("SELECT ") ||
+    message.includes("INSERT ") ||
+    message.includes("UPDATE ") ||
+    message.includes("DELETE ") ||
+    message.includes("connection pool") ||
+    message.includes("ECONNREFUSED") ||
+    message.includes("FATAL:") ||
+    message.includes("at ") ||
+    message.includes("node_modules") ||
+    message.includes("password") ||
+    message.includes("DATABASE_URL") ||
+    message.includes("Unique constraint failed");
+
+  if (isSensitiveInternalError) {
+    console.error("[Safe Server Action Error - Internal/Database]:", error);
+    return { success: false, error: fallbackMessage };
+  }
+
+  return { success: false, error: message || fallbackMessage };
+}
 
 /**
  * Hashes a plain password using bcrypt (10 rounds).

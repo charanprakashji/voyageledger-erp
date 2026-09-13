@@ -1,7 +1,7 @@
 "use server";
 
 import prisma from "@/lib/prisma";
-import { getCurrentUser, requireRole } from "@/lib/auth";
+import { requireRole, handleActionError } from "@/lib/auth";
 import { recordAuditLog } from "@/lib/audit";
 import { UserRole } from "@prisma/client";
 import { revalidatePath } from "next/cache";
@@ -17,14 +17,14 @@ export interface AttachDocumentInput {
 }
 
 export async function attachDocument(input: AttachDocumentInput) {
-  const currentUser = await requireRole([
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.TRAVEL_AGENT,
-    UserRole.ACCOUNTANT,
-  ]);
-
   try {
+    const currentUser = await requireRole([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.TRAVEL_AGENT,
+      UserRole.ACCOUNTANT,
+    ]);
+
     const doc = await prisma.documentAttachment.create({
       data: {
         bookingId: input.bookingId || null,
@@ -55,9 +55,8 @@ export async function attachDocument(input: AttachDocumentInput) {
       revalidatePath(`/bookings/${input.bookingId}`);
     }
 
-    return { success: true, data: doc };
+    return { success: true as const, data: doc };
   } catch (error: any) {
-    console.error("Error attaching document:", error);
-    return { success: false, error: error.message || "Failed to attach document" };
+    return handleActionError(error, "Failed to attach document");
   }
 }

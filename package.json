@@ -5,9 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "lint": "eslint",
-    "test": "npx tsx tests/test_staging_safety.ts && npx tsx test_phase1.ts && npx tsx test_phase2.ts && npx tsx test_phase3.ts && npx tsx test_phase4.ts && npx tsx test_phase5.ts",
+    "test": "npx tsx tests/test_staging_safety.ts && npx tsx tests/test_auth_security.ts && npx tsx tests/test_pre_deployment_audit.ts && npx tsx test_phase1.ts && npx tsx test_phase2.ts && npx tsx test_phase3.ts && npx tsx test_phase4.ts && npx tsx test_phase5.ts",
+    "test:auth": "npx tsx tests/test_auth_security.ts",
+    "test:audit": "npx tsx tests/test_pre_deployment_audit.ts",
     "test:safety": "npx tsx tests/test_staging_safety.ts",
     "postinstall": "prisma generate",
     "db:setup:local": "npx tsx scripts/setup_local_db.ts && npx prisma db push && npx tsx prisma/seed_local.ts",
@@ -20,6 +20,8 @@
   },
   "dependencies": {
     "@google-cloud/storage": "^7.15.2",
+    "@neon/config": "^1.4.2",
+    "@neon/env": "^1.3.2",
     "@prisma/client": "^5.22.0",
     "bcryptjs": "^2.4.3",
     "clsx": "^2.1.1",
