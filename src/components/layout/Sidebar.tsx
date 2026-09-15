@@ -1,8 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { Suspense } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   LayoutDashboard,
   PlaneTakeoff,
@@ -55,9 +55,16 @@ const navigationItems: NavItem[] = [
   { name: "Company Settings", href: "/settings", icon: Settings, category: "admin" },
 ];
 
-export function Sidebar() {
+function SidebarNav() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [isMoreOpen, setIsMoreOpen] = React.useState(true);
+
+  const serviceParam = searchParams?.get("service")?.toLowerCase();
+  const isTicketActive = pathname === "/bookings" && (serviceParam === "ticket" || serviceParam === "flight");
+  const isVisaActive = pathname === "/bookings" && serviceParam === "visa";
+  const isHotelActive = pathname === "/bookings" && serviceParam === "hotel";
+  const isAnySubServiceActive = isTicketActive || isVisaActive || isHotelActive;
 
   const renderSection = (category: "operations" | "directory" | "accounting" | "admin", label: string) => {
     const items = navigationItems.filter((item) => item.category === category);
@@ -72,6 +79,8 @@ export function Sidebar() {
             const isActive =
               item.href === "/"
                 ? pathname === "/"
+                : item.href === "/bookings"
+                ? pathname === "/bookings" && !isAnySubServiceActive && !pathname?.startsWith("/bookings/new")
                 : pathname === item.href || (item.href !== "/" && pathname?.startsWith(item.href) && !pathname?.startsWith("/bookings/new"));
 
             return (
@@ -123,7 +132,7 @@ export function Sidebar() {
               <button
                 type="button"
                 onClick={() => setIsMoreOpen((prev) => !prev)}
-                className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 rounded-lg transition-colors"
+                className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 rounded-lg transition-colors cursor-pointer"
               >
                 <span className="flex items-center gap-2">
                   <FolderTree className="w-3.5 h-3.5 text-blue-500" />
@@ -141,21 +150,36 @@ export function Sidebar() {
                 <div className="ml-3 pl-3 border-l border-slate-200 dark:border-slate-800 space-y-1 mt-1">
                   <Link
                     href="/bookings?service=ticket"
-                    className="flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
+                    className={cn(
+                      "flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors",
+                      isTicketActive
+                        ? "bg-blue-600 text-white font-semibold shadow-sm shadow-blue-500/20"
+                        : "text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    )}
                   >
                     <span>✈️</span>
                     <span>Ticket</span>
                   </Link>
                   <Link
                     href="/bookings?service=visa"
-                    className="flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
+                    className={cn(
+                      "flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors",
+                      isVisaActive
+                        ? "bg-emerald-600 text-white font-semibold shadow-sm shadow-emerald-500/20"
+                        : "text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    )}
                   >
                     <span>🛂</span>
                     <span>Visa</span>
                   </Link>
                   <Link
                     href="/bookings?service=hotel"
-                    className="flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
+                    className={cn(
+                      "flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors",
+                      isHotelActive
+                        ? "bg-amber-600 text-white font-semibold shadow-sm shadow-amber-500/20"
+                        : "text-slate-600 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    )}
                   >
                     <span>🏨</span>
                     <span>Hotel</span>
@@ -209,5 +233,17 @@ export function Sidebar() {
         </div>
       </div>
     </aside>
+  );
+}
+
+export function Sidebar() {
+  return (
+    <Suspense
+      fallback={
+        <aside className="w-64 border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 flex flex-col h-screen sticky top-0" />
+      }
+    >
+      <SidebarNav />
+    </Suspense>
   );
 }

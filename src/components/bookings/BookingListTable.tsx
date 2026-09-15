@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Search,
   Filter,
@@ -57,10 +57,49 @@ export function BookingListTable({
   suppliers,
 }: BookingListTableProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [customerFilter, setCustomerFilter] = useState<string>("ALL");
-  const [serviceTypeFilter, setServiceTypeFilter] = useState<string>("ALL");
+
+  const getServiceFromUrl = () => {
+    const s = searchParams?.get("service")?.toUpperCase();
+    if (s === "TICKET" || s === "FLIGHT") return "FLIGHT";
+    if (s === "VISA") return "VISA";
+    if (s === "HOTEL") return "HOTEL";
+    return s || "ALL";
+  };
+
+  const [serviceTypeFilter, setServiceTypeFilter] = useState<string>(getServiceFromUrl);
+
+  useEffect(() => {
+    const s = searchParams?.get("service")?.toUpperCase();
+    if (s) {
+      if (s === "TICKET" || s === "FLIGHT") {
+        setServiceTypeFilter("FLIGHT");
+      } else if (s === "VISA") {
+        setServiceTypeFilter("VISA");
+      } else if (s === "HOTEL") {
+        setServiceTypeFilter("HOTEL");
+      } else {
+        setServiceTypeFilter(s);
+      }
+    } else {
+      setServiceTypeFilter("ALL");
+    }
+  }, [searchParams]);
+
+  const handleServiceFilterChange = (val: string) => {
+    setServiceTypeFilter(val);
+    if (val === "ALL") {
+      router.push("/bookings");
+    } else if (val === "FLIGHT") {
+      router.push("/bookings?service=ticket");
+    } else {
+      router.push(`/bookings?service=${val.toLowerCase()}`);
+    }
+  };
+
   const [selectedBookingForCancel, setSelectedBookingForCancel] = useState<any | null>(null);
   const [cancellationReason, setCancellationReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -71,7 +110,12 @@ export function BookingListTable({
     if (statusFilter !== "ALL" && b.status !== statusFilter) return false;
     if (customerFilter !== "ALL" && b.customerId !== customerFilter) return false;
     if (serviceTypeFilter !== "ALL") {
-      const hasService = b.serviceItems?.some((s: any) => s.serviceType === serviceTypeFilter);
+      const hasService = b.serviceItems?.some((s: any) => {
+        if (serviceTypeFilter === "FLIGHT" || serviceTypeFilter === "TICKET") {
+          return s.serviceType === "FLIGHT";
+        }
+        return s.serviceType === serviceTypeFilter;
+      });
       if (!hasService) return false;
     }
     if (searchTerm) {
@@ -256,11 +300,11 @@ export function BookingListTable({
 
             <select
               value={serviceTypeFilter}
-              onChange={(e) => setServiceTypeFilter(e.target.value)}
+              onChange={(e) => handleServiceFilterChange(e.target.value)}
               className="px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200"
             >
               <option value="ALL">All Services</option>
-              <option value="FLIGHT">Flights</option>
+              <option value="FLIGHT">Ticket / Flights</option>
               <option value="HOTEL">Hotels</option>
               <option value="VISA">Visas</option>
               <option value="TRANSFER">Transfers</option>

@@ -98,7 +98,7 @@ export default async function SuppliersPage({ searchParams }: SuppliersPageProps
 
         <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto">
           <Filter className="w-4 h-4 text-slate-400" />
-          {(["ALL", "AIRLINE", "HOTEL", "DMC", "VISA_PROVIDER", "TRANSPORT", "TOUR_OPERATOR"] as const).map(
+          {(["ALL", "AIRLINE", "HOTEL", "DMC", "VISA_PROVIDER", "TRANSPORT_COMPANY", "INSURANCE_PROVIDER", "OTHER"] as const).map(
             (t) => (
               <Link
                 key={t}
