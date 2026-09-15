@@ -517,6 +517,16 @@ model Booking {
   totalSellPrice     Decimal              @default(0.00) @db.Decimal(15, 2)
   totalGrossMargin   Decimal              @default(0.00) @db.Decimal(15, 2)
 
+  // Additive Workflow & Payment Metadata
+  referrer           String?
+  liaison            String?
+  customerCommission Decimal              @default(0.00) @db.Decimal(15, 2)
+  additionalCharge   Decimal              @default(0.00) @db.Decimal(15, 2)
+  paymentMade        Boolean              @default(false)
+  paymentAccount     String?
+  paymentReceiver    String?
+  paymentSignature   String?
+
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
 
@@ -635,6 +645,9 @@ model FlightSegment {
   isRefundable       Boolean            @default(false)
   isChangeable       Boolean            @default(true)
   segmentOrder       Int                @default(1)
+  flightType         String?            @default("ONE_WAY") // ONE_WAY, ROUND_TRIP
+  ticketStatus       String?            @default("CONFIRM") // CONFIRM, DONE, REFUND, REISSUED, CANCELLED, VOID, OTHER
+  returnDateTime     DateTime?
   notes              String?
   createdAt          DateTime           @default(now())
 
@@ -1155,4 +1168,34 @@ model AuditLog {
   @@index([entityName, entityId])
   @@index([userId, createdAt])
   @@map("audit_logs")
+}
+
+// --------------------------------------------------------
+// MASTER DATA: SHAREHOLDERS (Directory / Master Data)
+// --------------------------------------------------------
+
+enum ShareholderStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Shareholder {
+  id                  String            @id @default(uuid())
+  code                String            @unique // e.g. "SH-001"
+  name                String
+  nationalId          String?           // Tazkira / National ID Number
+  contactPerson       String?
+  email               String?
+  phone               String?
+  address             String?
+  sharePercentage     Decimal           @default(0.00) @db.Decimal(5, 2) // e.g. 25.00%
+  capitalContribution Decimal           @default(0.00) @db.Decimal(15, 2) // Capital Amount
+  currency            String            @default("AFN")
+  status              ShareholderStatus @default(ACTIVE)
+  notes               String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  @@index([status])
+  @@map("shareholders")
 }

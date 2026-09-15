@@ -14,7 +14,7 @@ interface BookingEditPageProps {
 export default async function BookingEditPage({ params }: BookingEditPageProps) {
   const { id } = await params;
 
-  const [bookingRes, customerList, supplierList, settings] = await Promise.all([
+  const [bookingRes, customerList, supplierList, userList, settings] = await Promise.all([
     getBookingById(id),
     prisma.customer.findMany({
       where: { isActive: true },
@@ -24,6 +24,11 @@ export default async function BookingEditPage({ params }: BookingEditPageProps) 
     prisma.supplier.findMany({
       where: { isActive: true },
       select: { id: true, name: true, code: true, type: true, currency: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.user.findMany({
+      where: { status: "ACTIVE" },
+      select: { id: true, name: true, email: true, role: true },
       orderBy: { name: "asc" },
     }),
     prisma.companySetting.findFirst({
@@ -47,6 +52,7 @@ export default async function BookingEditPage({ params }: BookingEditPageProps) 
           initialData={bookingRes.data}
           customers={customerList}
           suppliers={supplierList}
+          employees={userList}
           defaultCurrencies={currencies}
         />
       </div>

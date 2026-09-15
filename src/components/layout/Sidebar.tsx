@@ -26,15 +26,19 @@ export interface NavItem {
   href: string;
   icon: React.ElementType;
   badge?: string;
-  category: "core" | "accounting" | "admin";
+  category: "operations" | "directory" | "accounting" | "admin";
 }
 
 const navigationItems: NavItem[] = [
-  // Core Operations
-  { name: "Dashboard", href: "/", icon: LayoutDashboard, category: "core" },
-  { name: "Customers", href: "/customers", icon: Users, badge: "Master", category: "core" },
-  { name: "Suppliers", href: "/suppliers", icon: Building2, badge: "Master", category: "core" },
-  { name: "Bookings", href: "/bookings", icon: PlaneTakeoff, category: "core" },
+  // Operations
+  { name: "Dashboard", href: "/", icon: LayoutDashboard, category: "operations" },
+  { name: "All Bookings", href: "/bookings", icon: PlaneTakeoff, category: "operations" },
+
+  // Directory
+  { name: "Customers", href: "/customers", icon: Users, badge: "Master", category: "directory" },
+  { name: "Suppliers", href: "/suppliers", icon: Building2, badge: "Master", category: "directory" },
+  { name: "Shareholders", href: "/shareholders", icon: UserCheck, badge: "Master", category: "directory" },
+  { name: "Employees & Users", href: "/users", icon: UserCheck, category: "directory" },
 
   // Accounting & General Ledger
   { name: "Chart of Accounts", href: "/accounting/chart-of-accounts", icon: FolderTree, badge: "GL", category: "accounting" },
@@ -48,18 +52,18 @@ const navigationItems: NavItem[] = [
   { name: "Financial Reports", href: "/reports", icon: BarChart3, category: "accounting" },
 
   // System Administration
-  { name: "Users & RBAC", href: "/users", icon: UserCheck, category: "admin" },
   { name: "Company Settings", href: "/settings", icon: Settings, category: "admin" },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const [isMoreOpen, setIsMoreOpen] = React.useState(true);
 
-  const renderSection = (category: "core" | "accounting" | "admin", label: string) => {
+  const renderSection = (category: "operations" | "directory" | "accounting" | "admin", label: string) => {
     const items = navigationItems.filter((item) => item.category === category);
     return (
-      <div className="mb-6">
-        <p className="px-3 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
+      <div className="mb-5">
+        <p className="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
           {label}
         </p>
         <div className="space-y-1">
@@ -68,7 +72,7 @@ export function Sidebar() {
             const isActive =
               item.href === "/"
                 ? pathname === "/"
-                : pathname?.startsWith(item.href);
+                : pathname === item.href || (item.href !== "/" && pathname?.startsWith(item.href) && !pathname?.startsWith("/bookings/new"));
 
             return (
               <Link
@@ -112,6 +116,54 @@ export function Sidebar() {
               </Link>
             );
           })}
+
+          {/* Expandable "More" Section under Operations (Ticket, Visa, Hotel) */}
+          {category === "operations" && (
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => setIsMoreOpen((prev) => !prev)}
+                className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 rounded-lg transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <FolderTree className="w-3.5 h-3.5 text-blue-500" />
+                  <span>More Services</span>
+                </span>
+                <ChevronRight
+                  className={cn(
+                    "w-3.5 h-3.5 text-slate-400 transition-transform duration-200",
+                    isMoreOpen && "rotate-90 text-blue-500"
+                  )}
+                />
+              </button>
+
+              {isMoreOpen && (
+                <div className="ml-3 pl-3 border-l border-slate-200 dark:border-slate-800 space-y-1 mt-1">
+                  <Link
+                    href="/bookings?service=ticket"
+                    className="flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
+                  >
+                    <span>✈️</span>
+                    <span>Ticket</span>
+                  </Link>
+                  <Link
+                    href="/bookings?service=visa"
+                    className="flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
+                  >
+                    <span>🛂</span>
+                    <span>Visa</span>
+                  </Link>
+                  <Link
+                    href="/bookings?service=hotel"
+                    className="flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
+                  >
+                    <span>🏨</span>
+                    <span>Hotel</span>
+                  </Link>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -138,9 +190,10 @@ export function Sidebar() {
 
       {/* Navigation Groups */}
       <div className="flex-1 overflow-y-auto px-4 py-4 scrollbar-thin">
-        {renderSection("core", "Operations & Masters")}
-        {renderSection("accounting", "General Ledger & Accounting")}
-        {renderSection("admin", "Administration")}
+        {renderSection("operations", "Operations")}
+        {renderSection("directory", "Directory")}
+        {renderSection("accounting", "Finance & Accounting")}
+        {renderSection("admin", "System Administration")}
       </div>
 
       {/* System Status Footer */}

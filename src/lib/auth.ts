@@ -140,11 +140,24 @@ export async function destroySession(): Promise<void> {
   cookieStore.delete(SESSION_COOKIE_NAME);
 }
 
+let mockTestUser: SessionUser | null = null;
+
+/**
+ * Sets a mock session user for automated testing suites.
+ */
+export function setMockSessionUser(user: SessionUser | null): void {
+  mockTestUser = user;
+}
+
 /**
  * Retrieves and validates the current authenticated session.
  * Re-validates against database to ensure user is ACTIVE.
  */
 export async function getCurrentUser(): Promise<SessionUser | null> {
+  if (mockTestUser) {
+    return mockTestUser;
+  }
+
   try {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME);

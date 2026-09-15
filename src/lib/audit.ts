@@ -34,7 +34,8 @@ export interface AuditLogPayload {
     | "Receipt"
     | "SupplierBill"
     | "SupplierPayment"
-    | "Expense";
+    | "Expense"
+    | "Shareholder";
   entityId: string;
   oldValues?: Record<string, unknown> | null;
   newValues?: Record<string, unknown> | null;
@@ -53,6 +54,13 @@ const SENSITIVE_KEYS = new Set([
   "refreshToken",
   "apiKey",
   "credentials",
+  "nationalId",
+  "tazkira",
+  "tazkiraNumber",
+  "passportNumber",
+  "creditCard",
+  "cvv",
+  "bankAccountSecret",
 ]);
 
 /**

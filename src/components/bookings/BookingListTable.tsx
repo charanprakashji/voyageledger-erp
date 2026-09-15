@@ -27,6 +27,17 @@ import {
 import { BookingStatus, ServiceType } from "@prisma/client";
 import { updateBookingStatus, cancelBooking } from "@/app/actions/bookings";
 
+function formatDate(dateStr?: string | Date | null): string {
+  if (!dateStr) return "—";
+  try {
+    const d = typeof dateStr === "string" ? new Date(dateStr) : dateStr;
+    if (isNaN(d.getTime())) return "—";
+    return d.toISOString().split("T")[0];
+  } catch {
+    return "—";
+  }
+}
+
 interface BookingListTableProps {
   initialData: any[];
   pagination: {
@@ -327,11 +338,11 @@ export function BookingListTable({
                     <td className="px-4 py-3.5 text-xs text-slate-600 dark:text-slate-400">
                       <div className="flex items-center gap-1 text-slate-800 dark:text-slate-200 font-medium">
                         <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                        {new Date(b.travelStartDate).toLocaleDateString()}
+                        {formatDate(b.travelStartDate)}
                       </div>
                       {b.travelEndDate && (
                         <div className="text-[11px] text-slate-400 ml-4.5">
-                          to {new Date(b.travelEndDate).toLocaleDateString()}
+                          to {formatDate(b.travelEndDate)}
                         </div>
                       )}
                     </td>

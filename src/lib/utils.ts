@@ -26,3 +26,17 @@ export function formatDateTime(date: Date | string | null | undefined): string {
     minute: "2-digit",
   });
 }
+
+/**
+ * Safely revalidates a Next.js path without throwing when invoked
+ * in non-HTTP CLI test runners or background script contexts.
+ */
+export function safeRevalidatePath(path: string, type?: "page" | "layout"): void {
+  try {
+    // Dynamic require/import to prevent SSR issues
+    const { revalidatePath } = require("next/cache");
+    revalidatePath(path, type);
+  } catch {
+    // Gracefully no-op in automated test environments
+  }
+}

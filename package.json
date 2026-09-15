@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "test": "npx tsx tests/test_staging_safety.ts && npx tsx tests/test_auth_security.ts && npx tsx tests/test_pre_deployment_audit.ts && npx tsx test_phase1.ts && npx tsx test_phase2.ts && npx tsx test_phase3.ts && npx tsx test_phase4.ts && npx tsx test_phase5.ts",
+    "test": "npx tsx tests/test_staging_safety.ts && npx tsx tests/test_auth_security.ts && npx tsx tests/test_pre_deployment_audit.ts && npx tsx test_phase1.ts && npx tsx test_phase2.ts && npx tsx test_phase3.ts && npx tsx test_phase4.ts && npx tsx test_phase5.ts && npx tsx tests/test_unified_booking_and_shareholders.ts && npx tsx tests/test_phase4_ui.ts",
+    "test:ui": "npx tsx tests/test_phase4_ui.ts",
+    "test:booking": "npx tsx tests/test_unified_booking_and_shareholders.ts",
     "test:auth": "npx tsx tests/test_auth_security.ts",
     "test:audit": "npx tsx tests/test_pre_deployment_audit.ts",
     "test:safety": "npx tsx tests/test_staging_safety.ts",

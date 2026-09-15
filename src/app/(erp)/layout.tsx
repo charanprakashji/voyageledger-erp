@@ -1,7 +1,8 @@
 import React from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, SESSION_COOKIE_NAME } from "@/lib/auth";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +15,12 @@ export default async function ErpLayout({
   const user = await getCurrentUser();
 
   if (!user) {
+    try {
+      const cookieStore = await cookies();
+      cookieStore.delete(SESSION_COOKIE_NAME);
+    } catch {
+      // In server rendering context, continue to redirect
+    }
     redirect("/login");
   }
 

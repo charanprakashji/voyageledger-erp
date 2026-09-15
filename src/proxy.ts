@@ -27,8 +27,11 @@ export async function proxy(req: NextRequest) {
     // If already logged in, redirect to dashboard or original redirect destination
     if (isAuthenticated) {
       const redirectTo = req.nextUrl.searchParams.get("redirect");
-      const targetUrl = sanitizeRedirectUrl(redirectTo);
-      return NextResponse.redirect(new URL(targetUrl, req.nextUrl));
+      if (redirectTo && redirectTo !== "/login") {
+        const targetUrl = sanitizeRedirectUrl(redirectTo);
+        return NextResponse.redirect(new URL(targetUrl, req.nextUrl));
+      }
+      return NextResponse.redirect(new URL("/", req.nextUrl));
     }
     return NextResponse.next();
   }
