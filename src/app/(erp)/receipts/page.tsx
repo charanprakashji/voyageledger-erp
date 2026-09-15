@@ -2,7 +2,6 @@ import React from 'react';
 import prisma from '@/lib/prisma';
 import { getReceipts } from '@/app/actions/receipts';
 import { ReceiptListTable } from '@/components/receipts/ReceiptListTable';
-import { Header } from '@/components/layout/Header';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,15 +34,10 @@ export default async function ReceiptsPage() {
   }
 
   return (
-    <div>
-      <Header title="Customer Receipts & Settlements" userRole="ADMIN" />
-      <div className="p-8">
-        <ReceiptListTable
-          initialData={receipts}
-          pagination={pagination}
-          customers={customers}
-        />
-      </div>
-    </div>
+    <ReceiptListTable
+      initialData={receipts}
+      pagination={pagination}
+      customers={customers}
+    />
   );
 }

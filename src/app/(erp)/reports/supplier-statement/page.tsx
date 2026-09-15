@@ -1,7 +1,6 @@
 import React from "react";
 import prisma from "@/lib/prisma";
 import { getSupplierDerivedLedger } from "@/lib/financialReports";
-import { Header } from "@/components/layout/Header";
 import { Building2, ArrowLeft, FileText, CheckCircle } from "lucide-react";
 import Link from "next/link";
 
@@ -31,9 +30,7 @@ export default async function SupplierStatementPage({ searchParams }: SupplierSt
   }
 
   return (
-    <div>
-      <Header title="Supplier Statement & AP Ledger" userRole="ADMIN" />
-      <div className="p-8 max-w-6xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link
@@ -152,6 +149,5 @@ export default async function SupplierStatementPage({ searchParams }: SupplierSt
           </div>
         )}
       </div>
-    </div>
   );
 }

@@ -2,7 +2,6 @@ import React, { Suspense } from "react";
 import prisma from "@/lib/prisma";
 import { getBookings } from "@/app/actions/bookings";
 import { BookingListTable } from "@/components/bookings/BookingListTable";
-import { Header } from "@/components/layout/Header";
 
 export const dynamic = "force-dynamic";
 
@@ -38,18 +37,13 @@ export default async function BookingsPage() {
   }
 
   return (
-    <div>
-      <Header title="Travel Bookings & Operations" userRole="ADMIN" />
-      <div className="p-8">
-        <Suspense fallback={<div className="p-8 text-center text-slate-400">Loading bookings...</div>}>
-          <BookingListTable
-            initialData={bookings}
-            pagination={pagination}
-            customers={customers}
-            suppliers={suppliers}
-          />
-        </Suspense>
-      </div>
-    </div>
+    <Suspense fallback={<div className="text-center text-slate-400 py-12">Loading bookings...</div>}>
+      <BookingListTable
+        initialData={bookings}
+        pagination={pagination}
+        customers={customers}
+        suppliers={suppliers}
+      />
+    </Suspense>
   );
 }

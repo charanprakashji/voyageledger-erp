@@ -1,7 +1,6 @@
 import React from "react";
 import prisma from "@/lib/prisma";
 import { BookingForm } from "@/components/bookings/BookingForm";
-import { Header } from "@/components/layout/Header";
 
 export const dynamic = "force-dynamic";
 
@@ -44,16 +43,11 @@ export default async function NewBookingPage() {
   }
 
   return (
-    <div>
-      <Header title="New Travel Booking" userRole="ADMIN" />
-      <div className="p-8">
-        <BookingForm
-          customers={customers}
-          suppliers={suppliers}
-          employees={employees}
-          defaultCurrencies={currencies}
-        />
-      </div>
-    </div>
+    <BookingForm
+      customers={customers}
+      suppliers={suppliers}
+      employees={employees}
+      defaultCurrencies={currencies}
+    />
   );
 }

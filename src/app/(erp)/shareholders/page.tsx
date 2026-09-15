@@ -2,7 +2,6 @@ import React from "react";
 import prisma from "@/lib/prisma";
 import { getShareholders } from "@/app/actions/shareholders";
 import { ShareholderList } from "@/components/shareholders/ShareholderList";
-import { Header } from "@/components/layout/Header";
 
 export const dynamic = "force-dynamic";
 
@@ -20,12 +19,5 @@ export default async function ShareholdersPage() {
     console.error("Error loading shareholders page:", err);
   }
 
-  return (
-    <div>
-      <Header title="Company Shareholders & Capital Structure" userRole="ADMIN" />
-      <div className="p-8">
-        <ShareholderList initialData={shareholders} pagination={pagination} />
-      </div>
-    </div>
-  );
+  return <ShareholderList initialData={shareholders} pagination={pagination} />;
 }

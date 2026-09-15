@@ -2,7 +2,6 @@ import React from "react";
 import prisma from "@/lib/prisma";
 import { getSupplierBills } from "@/app/actions/bills";
 import { SupplierBillListTable } from "@/components/bills/SupplierBillListTable";
-import { Header } from "@/components/layout/Header";
 
 export const dynamic = "force-dynamic";
 
@@ -35,15 +34,10 @@ export default async function SupplierBillsPage() {
   }
 
   return (
-    <div>
-      <Header title="Supplier Bills & AP" userRole="ADMIN" />
-      <div className="p-8">
-        <SupplierBillListTable
-          initialData={bills}
-          pagination={pagination}
-          suppliers={suppliers}
-        />
-      </div>
-    </div>
+    <SupplierBillListTable
+      initialData={bills}
+      pagination={pagination}
+      suppliers={suppliers}
+    />
   );
 }

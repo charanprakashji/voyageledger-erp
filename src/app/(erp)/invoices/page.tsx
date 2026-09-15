@@ -2,7 +2,6 @@ import React from 'react';
 import prisma from '@/lib/prisma';
 import { getInvoices } from '@/app/actions/invoices';
 import { InvoiceListTable } from '@/components/invoices/InvoiceListTable';
-import { Header } from '@/components/layout/Header';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,15 +34,10 @@ export default async function InvoicesPage() {
   }
 
   return (
-    <div>
-      <Header title="Customer Invoices & Billing" userRole="ADMIN" />
-      <div className="p-8">
-        <InvoiceListTable
-          initialData={invoices}
-          pagination={pagination}
-          customers={customers}
-        />
-      </div>
-    </div>
+    <InvoiceListTable
+      initialData={invoices}
+      pagination={pagination}
+      customers={customers}
+    />
   );
 }

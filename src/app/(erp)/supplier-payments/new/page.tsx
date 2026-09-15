@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Header } from "@/components/layout/Header";
 import { createSupplierPayment } from "@/app/actions/bills";
 import { ArrowLeft, Save, Send } from "lucide-react";
 import Link from "next/link";
@@ -102,11 +101,9 @@ export default function NewSupplierPaymentPage() {
   };
 
   return (
-    <div>
-      <Header title="Record Supplier Payment / Advance" userRole="ADMIN" />
-      <div className="p-8 max-w-4xl mx-auto space-y-8">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+    <div className="max-w-4xl mx-auto space-y-8">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
             <Link
               href="/supplier-payments"
               className="p-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -281,6 +278,5 @@ export default function NewSupplierPaymentPage() {
           </div>
         </div>
       </div>
-    </div>
   );
 }

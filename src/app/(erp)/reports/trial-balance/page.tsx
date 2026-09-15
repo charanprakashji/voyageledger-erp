@@ -1,6 +1,5 @@
 import React from "react";
 import { getTrialBalance } from "@/lib/financialReports";
-import { Header } from "@/components/layout/Header";
 import { Scale, CheckCircle, AlertTriangle, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
@@ -10,9 +9,7 @@ export default async function TrialBalancePage() {
   const report = await getTrialBalance();
 
   return (
-    <div>
-      <Header title="Trial Balance" userRole="ADMIN" />
-      <div className="p-8 max-w-6xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link
@@ -98,6 +95,5 @@ export default async function TrialBalancePage() {
           </div>
         </div>
       </div>
-    </div>
   );
 }

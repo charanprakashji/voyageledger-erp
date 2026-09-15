@@ -1,7 +1,6 @@
 import React from "react";
 import prisma from "@/lib/prisma";
 import { getSupplierPayments } from "@/app/actions/bills";
-import { Header } from "@/components/layout/Header";
 import { CreditCard, Plus, CheckCircle, Clock, Ban } from "lucide-react";
 import Link from "next/link";
 
@@ -19,9 +18,7 @@ export default async function SupplierPaymentsPage() {
   }
 
   return (
-    <div>
-      <Header title="Supplier Payments & Disbursements" userRole="ADMIN" />
-      <div className="p-8 space-y-6">
+    <div className="space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-xl font-bold text-slate-900 dark:text-white">
@@ -118,6 +115,5 @@ export default async function SupplierPaymentsPage() {
           </div>
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  }

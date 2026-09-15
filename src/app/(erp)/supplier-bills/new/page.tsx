@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Header } from "@/components/layout/Header";
 import { createSupplierBill } from "@/app/actions/bills";
 import { Plus, Trash2, ArrowLeft, Save, Send } from "lucide-react";
 import Link from "next/link";
@@ -145,10 +144,8 @@ export default function NewSupplierBillPage() {
   };
 
   return (
-    <div>
-      <Header title="New Supplier Bill" userRole="ADMIN" />
-      <div className="p-8 max-w-6xl mx-auto space-y-8">
-        <div className="flex items-center justify-between">
+    <div className="max-w-6xl mx-auto space-y-8">
+      <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link
               href="/supplier-bills"
@@ -414,6 +411,5 @@ export default function NewSupplierBillPage() {
           </div>
         </div>
       </div>
-    </div>
   );
 }

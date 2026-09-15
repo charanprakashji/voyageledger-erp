@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { getBookingById } from "@/app/actions/bookings";
 import { BookingForm } from "@/components/bookings/BookingForm";
-import { Header } from "@/components/layout/Header";
 
 export const dynamic = "force-dynamic";
 
@@ -45,17 +44,12 @@ export default async function BookingEditPage({ params }: BookingEditPageProps) 
     : ["AFN", "USD", "EUR", "AED", "GBP"];
 
   return (
-    <div>
-      <Header title={`Edit Booking ${bookingRes.data.bookingNumber}`} userRole="ADMIN" />
-      <div className="p-8">
-        <BookingForm
-          initialData={bookingRes.data}
-          customers={customerList}
-          suppliers={supplierList}
-          employees={userList}
-          defaultCurrencies={currencies}
-        />
-      </div>
-    </div>
+    <BookingForm
+      initialData={bookingRes.data}
+      customers={customerList}
+      suppliers={supplierList}
+      employees={userList}
+      defaultCurrencies={currencies}
+    />
   );
 }

@@ -1,6 +1,5 @@
 import React from "react";
 import { getBookingProfitability } from "@/lib/financialReports";
-import { Header } from "@/components/layout/Header";
 import { PieChart, ArrowLeft, PlaneTakeoff } from "lucide-react";
 import Link from "next/link";
 
@@ -10,9 +9,7 @@ export default async function BookingProfitabilityPage() {
   const reports = await getBookingProfitability();
 
   return (
-    <div>
-      <Header title="Booking Profitability Analysis" userRole="ADMIN" />
-      <div className="p-8 max-w-6xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
           <Link
             href="/reports"
@@ -92,6 +89,5 @@ export default async function BookingProfitabilityPage() {
           </div>
         </div>
       </div>
-    </div>
   );
 }

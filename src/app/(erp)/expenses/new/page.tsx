@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Header } from "@/components/layout/Header";
 import { createExpense } from "@/app/actions/expenses";
 import { Plus, Trash2, ArrowLeft, Save, Send } from "lucide-react";
 import Link from "next/link";
@@ -140,9 +139,7 @@ export default function NewExpensePage() {
   };
 
   return (
-    <div>
-      <Header title="Record Operating Expense" userRole="ADMIN" />
-      <div className="p-8 max-w-5xl mx-auto space-y-8">
+    <div className="max-w-5xl mx-auto space-y-8">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link
@@ -363,6 +360,5 @@ export default function NewExpensePage() {
           </div>
         </div>
       </div>
-    </div>
   );
 }

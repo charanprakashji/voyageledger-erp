@@ -2,7 +2,6 @@ import React from 'react';
 import { notFound } from 'next/navigation';
 import { getInvoiceById } from '@/app/actions/invoices';
 import { InvoiceDetailView } from '@/components/invoices/InvoiceDetailView';
-import { Header } from '@/components/layout/Header';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,11 +18,8 @@ export default async function InvoiceDetailPage({ params }: InvoicePageProps) {
   }
 
   return (
-    <div>
-      <Header title={`Invoice ${res.data.invoiceNumber}`} userRole="ADMIN" />
-      <div className="p-8 max-w-7xl mx-auto">
-        <InvoiceDetailView invoice={res.data} />
-      </div>
+    <div className="max-w-7xl mx-auto">
+      <InvoiceDetailView invoice={res.data} />
     </div>
   );
 }

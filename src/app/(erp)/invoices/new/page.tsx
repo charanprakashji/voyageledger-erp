@@ -1,7 +1,6 @@
 import React from 'react';
 import prisma from '@/lib/prisma';
 import { InvoiceForm } from '@/components/invoices/InvoiceForm';
-import { Header } from '@/components/layout/Header';
 
 export const dynamic = 'force-dynamic';
 
@@ -76,16 +75,13 @@ export default async function NewInvoicePage({ searchParams }: NewInvoicePagePro
   }));
 
   return (
-    <div>
-      <Header title="Generate Customer Invoice" userRole="ADMIN" />
-      <div className="p-8 max-w-7xl mx-auto">
-        <InvoiceForm
-          customers={customers}
-          bookings={bookings}
-          taxConfigurations={taxConfigurations}
-          chartOfAccounts={chartOfAccounts}
-        />
-      </div>
+    <div className="max-w-7xl mx-auto">
+      <InvoiceForm
+        customers={customers}
+        bookings={bookings}
+        taxConfigurations={taxConfigurations}
+        chartOfAccounts={chartOfAccounts}
+      />
     </div>
   );
 }

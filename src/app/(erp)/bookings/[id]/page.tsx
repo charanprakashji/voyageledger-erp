@@ -2,7 +2,6 @@ import React from "react";
 import { notFound } from "next/navigation";
 import { getBookingById } from "@/app/actions/bookings";
 import { BookingDetailView } from "@/components/bookings/BookingDetailView";
-import { Header } from "@/components/layout/Header";
 
 export const dynamic = "force-dynamic";
 
@@ -18,12 +17,5 @@ export default async function BookingDetailPage({ params }: BookingPageProps) {
     notFound();
   }
 
-  return (
-    <div>
-      <Header title={`Booking File ${res.data.bookingNumber}`} userRole="ADMIN" />
-      <div className="p-8">
-        <BookingDetailView booking={res.data} />
-      </div>
-    </div>
-  );
+  return <BookingDetailView booking={res.data} />;
 }

@@ -1,6 +1,5 @@
 import React from "react";
 import { getBalanceSheet } from "@/lib/financialReports";
-import { Header } from "@/components/layout/Header";
 import { Landmark, ArrowLeft, CheckCircle, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 
@@ -10,9 +9,7 @@ export default async function BalanceSheetPage() {
   const report = await getBalanceSheet();
 
   return (
-    <div>
-      <Header title="Balance Sheet" userRole="ADMIN" />
-      <div className="p-8 max-w-5xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link
@@ -150,6 +147,5 @@ export default async function BalanceSheetPage() {
           </div>
         </div>
       </div>
-    </div>
   );
 }

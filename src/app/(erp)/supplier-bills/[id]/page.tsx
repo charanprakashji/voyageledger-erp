@@ -1,7 +1,6 @@
 import React from "react";
 import prisma from "@/lib/prisma";
 import { getSupplierBillById, approveSupplierBill, postSupplierBill, cancelSupplierBill } from "@/app/actions/bills";
-import { Header } from "@/components/layout/Header";
 import {
   FileText,
   ArrowLeft,
@@ -36,10 +35,8 @@ export default async function SupplierBillDetailPage({ params }: SupplierBillDet
   const bill = res.data;
 
   return (
-    <div>
-      <Header title={`Supplier Bill ${bill.billNumber}`} userRole="ADMIN" />
-      <div className="p-8 max-w-6xl mx-auto space-y-8">
-        {/* Top bar */}
+    <div className="max-w-6xl mx-auto space-y-8">
+      {/* Top bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link
@@ -286,6 +283,5 @@ export default async function SupplierBillDetailPage({ params }: SupplierBillDet
           </div>
         )}
       </div>
-    </div>
-  );
+    );
 }

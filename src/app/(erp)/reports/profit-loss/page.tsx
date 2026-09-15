@@ -1,6 +1,5 @@
 import React from "react";
 import { getProfitAndLoss } from "@/lib/financialReports";
-import { Header } from "@/components/layout/Header";
 import { TrendingUp, ArrowLeft, DollarSign } from "lucide-react";
 import Link from "next/link";
 
@@ -10,9 +9,7 @@ export default async function ProfitLossPage() {
   const report = await getProfitAndLoss();
 
   return (
-    <div>
-      <Header title="Profit & Loss Statement" userRole="ADMIN" />
-      <div className="p-8 max-w-5xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
           <Link
             href="/reports"
@@ -153,6 +150,5 @@ export default async function ProfitLossPage() {
           </div>
         </div>
       </div>
-    </div>
   );
 }

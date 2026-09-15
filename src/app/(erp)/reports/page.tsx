@@ -1,5 +1,4 @@
 import React from "react";
-import { Header } from "@/components/layout/Header";
 import Link from "next/link";
 import {
   Scale,
@@ -182,27 +181,24 @@ export default function ReportsHubPage() {
   );
 
   return (
-    <div>
-      <Header title="Financial Statements & Reports Catalog" userRole="ADMIN" />
-      <div className="p-8 max-w-7xl mx-auto space-y-10">
-        <div className="flex items-center justify-between pb-6 border-b border-slate-200">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-900">
-              Executive Financial Reporting Hub
-            </h2>
-            <p className="text-sm text-slate-500 mt-1">
-              Derived dynamically from POSTED double-entry General Ledger transactions.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold">
-            <ShieldCheck className="w-4 h-4" /> Single Source of Truth: GL
-          </div>
+    <div className="max-w-7xl mx-auto space-y-10">
+      <div className="flex items-center justify-between pb-6 border-b border-slate-200">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900">
+            Executive Financial Reporting Hub
+          </h2>
+          <p className="text-sm text-slate-500 mt-1">
+            Derived dynamically from POSTED double-entry General Ledger transactions.
+          </p>
         </div>
-
-        {renderSection("Core Financial Statements", "Primary statutory and GAAP financial statements", coreReports)}
-        {renderSection("Subsidiary & Operational Ledgers", "Customer, supplier, aging, and booking profitability analysis", operationalReports)}
-        {renderSection("Treasury, Tax & Analytics", "Liquidity, FX gains/losses, Afghan tax audit, and overheads", analysisReports)}
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold">
+          <ShieldCheck className="w-4 h-4" /> Single Source of Truth: GL
+        </div>
       </div>
+
+      {renderSection("Core Financial Statements", "Primary statutory and GAAP financial statements", coreReports)}
+      {renderSection("Subsidiary & Operational Ledgers", "Customer, supplier, aging, and booking profitability analysis", operationalReports)}
+      {renderSection("Treasury, Tax & Analytics", "Liquidity, FX gains/losses, Afghan tax audit, and overheads", analysisReports)}
     </div>
   );
 }

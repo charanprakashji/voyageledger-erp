@@ -1,7 +1,6 @@
 import React from 'react';
 import prisma from '@/lib/prisma';
 import { ReceiptForm } from '@/components/receipts/ReceiptForm';
-import { Header } from '@/components/layout/Header';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,15 +67,12 @@ export default async function NewReceiptPage() {
   }));
 
   return (
-    <div>
-      <Header title="Record Customer Receipt / Payment" userRole="ADMIN" />
-      <div className="p-8 max-w-6xl mx-auto">
-        <ReceiptForm
-          customers={customers}
-          invoices={invoices}
-          bankAccounts={bankAccounts}
-        />
-      </div>
+    <div className="max-w-6xl mx-auto">
+      <ReceiptForm
+        customers={customers}
+        invoices={invoices}
+        bankAccounts={bankAccounts}
+      />
     </div>
   );
 }
